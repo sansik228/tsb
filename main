@@ -1,5 +1,5 @@
--- Sansik UI Library v3.6
--- Added Dropdown (Gen2 style)
+-- Sansik UI Library v3.7
+-- Fixed Dropdown overlap + search
 
 local Sansik = {}
 Sansik.Flags = {}
@@ -643,6 +643,7 @@ function Sansik:Window(props)
         Page.BackgroundTransparency = 1
         Page.AutomaticSize = Enum.AutomaticSize.Y
         Page.Visible = false
+        Page.ClipsDescendants = false
         Page.Parent = Content
 
         local PageLayout = Instance.new("UIListLayout")
@@ -964,13 +965,13 @@ function Sansik:Window(props)
             return obj
         end
 
-        -- ============ DROPDOWN (Gen2 style) ============
+        -- ============ DROPDOWN (fixed) ============
         function Tab:Dropdown(props)
             local dropdown = baseElement(46)
             dropdown.Name = props.name or "Dropdown"
             dropdown.ClipsDescendants = false
+            dropdown.ZIndex = 1
 
-            -- Заголовок
             local label = Instance.new("TextLabel")
             label.Text = props.name or "Dropdown"
             label.Font = Enum.Font.GothamMedium
@@ -980,9 +981,9 @@ function Sansik:Window(props)
             label.TextXAlignment = Enum.TextXAlignment.Left
             label.Position = UDim2.new(0, 14, 0, 0)
             label.Size = UDim2.new(0.5, 0, 1, 0)
+            label.ZIndex = 2
             label.Parent = dropdown
 
-            -- Выбранное значение справа
             local selectedLabel = Instance.new("TextLabel")
             selectedLabel.Text = props.value or "None"
             selectedLabel.Font = Enum.Font.Gotham
@@ -992,15 +993,16 @@ function Sansik:Window(props)
             selectedLabel.TextXAlignment = Enum.TextXAlignment.Right
             selectedLabel.Position = UDim2.new(0.5, 0, 0, 0)
             selectedLabel.Size = UDim2.new(0.5, -40, 1, 0)
+            selectedLabel.ZIndex = 2
             selectedLabel.Parent = dropdown
 
-            -- Стрелка
             local arrow = Instance.new("ImageLabel")
             arrow.Name = "Arrow"
             arrow.Size = UDim2.new(0, 14, 0, 14)
             arrow.Position = UDim2.new(1, -24, 0.5, -7)
             arrow.BackgroundTransparency = 1
             arrow.ImageColor3 = Sansik.Theme.TextSecondary
+            arrow.ZIndex = 2
             arrow.Parent = dropdown
 
             local arrowIco = getIcon("chevron-down")
@@ -1010,12 +1012,12 @@ function Sansik:Window(props)
                 if arrowIco.rectSize then arrow.ImageRectSize = arrowIco.rectSize end
             end
 
-            -- Кнопка-кликалка
             local clickable = Instance.new("TextButton")
             clickable.Size = UDim2.new(1, 0, 1, 0)
             clickable.BackgroundTransparency = 1
             clickable.Text = ""
             clickable.AutoButtonColor = false
+            clickable.ZIndex = 3
             clickable.Parent = dropdown
             corner(clickable, 10)
 
@@ -1028,19 +1030,24 @@ function Sansik:Window(props)
                 end
             end)
 
-            -- Список опций (скрытый по умолчанию)
+            -- === Список создаётся на уровне Page (НЕ внутри dropdown) ===
             local list = Instance.new("Frame")
-            list.Name = "List"
-            list.Size = UDim2.new(1, 0, 0, 0)
-            list.Position = UDim2.new(0, 0, 1, 4)
+            list.Name = "DropdownList_" .. (props.name or "Unnamed") .. "_" .. tostring(math.random(1000, 9999))
+            list.Size = UDim2.new(0, 0, 0, 0)
+            list.Position = UDim2.new(0, 0, 0, 0)
             list.BackgroundColor3 = Sansik.Theme.DropdownBackground
             list.BorderSizePixel = 0
             list.Visible = false
             list.ClipsDescendants = true
-            list.ZIndex = 10
-            list.Parent = dropdown
+            list.ZIndex = 100
+            list.Parent = Page
             corner(list, 10)
             stroke(list, Sansik.Theme.ElementStroke, 1, 0.5)
+
+            local function updateListPosition()
+                list.Position = UDim2.new(0, dropdown.AbsolutePosition.X - Page.AbsolutePosition.X, 0, dropdown.AbsolutePosition.Y - Page.AbsolutePosition.Y + dropdown.AbsoluteSize.Y + 4)
+                list.Size = UDim2.new(0, dropdown.AbsoluteSize.X, 0, 0)
+            end
 
             local searchBox = Instance.new("TextBox")
             searchBox.Name = "Search"
@@ -1056,14 +1063,13 @@ function Sansik:Window(props)
             searchBox.PlaceholderColor3 = Sansik.Theme.TextSecondary
             searchBox.TextXAlignment = Enum.TextXAlignment.Left
             searchBox.ClearTextOnFocus = false
-            searchBox.ZIndex = 11
+            searchBox.ZIndex = 101
             searchBox.Parent = list
             corner(searchBox, 6)
             local searchPadding = Instance.new("UIPadding")
             searchPadding.PaddingLeft = UDim.new(0, 10)
             searchPadding.Parent = searchBox
 
-            -- Скролл для опций
             local optionsScroll = Instance.new("ScrollingFrame")
             optionsScroll.Name = "Options"
             optionsScroll.Size = UDim2.new(1, -16, 1, -48)
@@ -1074,7 +1080,7 @@ function Sansik:Window(props)
             optionsScroll.ScrollBarImageColor3 = Sansik.Theme.ElementStroke
             optionsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
             optionsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-            optionsScroll.ZIndex = 11
+            optionsScroll.ZIndex = 101
             optionsScroll.Parent = list
 
             local optionsLayout = Instance.new("UIListLayout")
@@ -1090,6 +1096,15 @@ function Sansik:Window(props)
             end
             updateSelected()
 
+            local function closeList()
+                dropdown:SetAttribute("Open", false)
+                arrow.Rotation = 0
+                tween(list, 0.2, {Size = UDim2.new(0, dropdown.AbsoluteSize.X, 0, 0), BackgroundTransparency = 1})
+                task.wait(0.2)
+                list.Visible = false
+                tween(dropdown, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackground})
+            end
+
             local function createOption(optionName)
                 local optionBtn = Instance.new("TextButton")
                 optionBtn.Name = optionName
@@ -1098,17 +1113,16 @@ function Sansik:Window(props)
                 optionBtn.BorderSizePixel = 0
                 optionBtn.Text = ""
                 optionBtn.AutoButtonColor = false
-                optionBtn.ZIndex = 11
+                optionBtn.ZIndex = 102
                 optionBtn.Parent = optionsScroll
                 corner(optionBtn, 6)
 
-                -- Иконка-квадратик слева
                 local optIcon = Instance.new("ImageLabel")
                 optIcon.Size = UDim2.new(0, 14, 0, 14)
                 optIcon.Position = UDim2.new(0, 12, 0.5, -7)
                 optIcon.BackgroundTransparency = 1
                 optIcon.ImageColor3 = Sansik.Theme.TextSecondary
-                optIcon.ZIndex = 12
+                optIcon.ZIndex = 103
                 optIcon.Parent = optionBtn
 
                 local sqIco = getIcon("square")
@@ -1127,7 +1141,7 @@ function Sansik:Window(props)
                 optLabel.TextXAlignment = Enum.TextXAlignment.Left
                 optLabel.Position = UDim2.new(0, 36, 0, 0)
                 optLabel.Size = UDim2.new(1, -48, 1, 0)
-                optLabel.ZIndex = 12
+                optLabel.ZIndex = 103
                 optLabel.Parent = optionBtn
 
                 optionBtn.MouseEnter:Connect(function()
@@ -1142,13 +1156,7 @@ function Sansik:Window(props)
                     updateSelected()
                     if props.flag then Sansik.Flags[props.flag] = currentValue end
                     if props.callback then pcall(props.callback, currentValue) end
-                    -- закрыть dropdown
-                    dropdown:SetAttribute("Open", false)
-                    arrow.Rotation = 0
-                    tween(list, 0.2, {Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1})
-                    task.wait(0.2)
-                    list.Visible = false
-                    tween(dropdown, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackground})
+                    closeList()
                 end)
 
                 return optionBtn
@@ -1158,7 +1166,6 @@ function Sansik:Window(props)
                 table.insert(optionButtons, createOption(optionName))
             end
 
-            -- Поиск
             searchBox:GetPropertyChangedSignal("Text"):Connect(function()
                 local query = string.lower(searchBox.Text)
                 for _, optBtn in ipairs(optionButtons) do
@@ -1170,22 +1177,25 @@ function Sansik:Window(props)
                 end
             end)
 
-            -- Открытие/закрытие
             clickable.MouseButton1Click:Connect(function()
                 local isOpen = dropdown:GetAttribute("Open") or false
                 if isOpen then
-                    dropdown:SetAttribute("Open", false)
-                    arrow.Rotation = 0
-                    tween(list, 0.25, {Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1})
-                    task.wait(0.25)
-                    list.Visible = false
-                    tween(dropdown, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackground})
+                    closeList()
                 else
+                    -- Закрыть все другие открытые списки
+                    for _, other in ipairs(Page:GetChildren()) do
+                        if other.Name:find("DropdownList_") and other ~= list then
+                            other.Visible = false
+                            other.Size = UDim2.new(0, 0, 0, 0)
+                        end
+                    end
+
                     dropdown:SetAttribute("Open", true)
                     arrow.Rotation = 180
+                    updateListPosition()
                     list.Visible = true
                     list.BackgroundTransparency = 1
-                    tween(list, 0.25, {Size = UDim2.new(1, 0, 0, 200), BackgroundTransparency = 0})
+                    tween(list, 0.25, {Size = UDim2.new(0, dropdown.AbsoluteSize.X, 0, 200), BackgroundTransparency = 0})
                 end
             end)
 
