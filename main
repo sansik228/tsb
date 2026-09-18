@@ -1,5 +1,5 @@
--- Sansik UI Library v3.7
--- Fixed Dropdown overlap + search
+-- Sansik UI Library v3.8
+-- Dropdown list rendered on top of Main
 
 local Sansik = {}
 Sansik.Flags = {}
@@ -400,6 +400,7 @@ function Sansik:Window(props)
     Content.ScrollBarImageColor3 = Sansik.Theme.ElementStroke
     Content.CanvasSize = UDim2.new(0, 0, 0, 0)
     Content.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    Content.ClipsDescendants = false
     Content.Parent = Main
 
     local BottomLeftFix = Instance.new("Frame")
@@ -422,6 +423,15 @@ function Sansik:Window(props)
     BottomRightFix.Parent = Main
     corner(BottomRightFix, 14)
 
+    -- Слой для дропдаунов (поверх всего, но внутри Main)
+    local DropdownLayer = Instance.new("Frame")
+    DropdownLayer.Name = "DropdownLayer"
+    DropdownLayer.Size = UDim2.new(1, 0, 1, 0)
+    DropdownLayer.BackgroundTransparency = 1
+    DropdownLayer.ClipsDescendants = false
+    DropdownLayer.ZIndex = 500
+    DropdownLayer.Parent = Main
+
     makeDraggable(Main, Topbar)
 
     -- ============ NOTIFICATIONS ============
@@ -441,6 +451,7 @@ function Sansik:Window(props)
     -- ============ WINDOW OBJECT ============
     local Window = {}
     local currentTab = nil
+    local openDropdownList = nil
 
     function Window:Notify(props)
         props = props or {}
@@ -651,8 +662,18 @@ function Sansik:Window(props)
         PageLayout.SortOrder = Enum.SortOrder.LayoutOrder
         PageLayout.Parent = Page
 
+        local function closeAllDropdowns()
+            if openDropdownList then
+                openDropdownList.Visible = false
+                openDropdownList.Size = UDim2.new(0, 0, 0, 0)
+                openDropdownList = nil
+            end
+        end
+
         local function select()
             if currentTab == Page then return end
+
+            closeAllDropdowns()
 
             if currentTab then
                 currentTab.Visible = false
@@ -965,7 +986,7 @@ function Sansik:Window(props)
             return obj
         end
 
-        -- ============ DROPDOWN (fixed) ============
+        -- ============ DROPDOWN (fixed, на слое Main) ============
         function Tab:Dropdown(props)
             local dropdown = baseElement(46)
             dropdown.Name = props.name or "Dropdown"
@@ -1030,22 +1051,27 @@ function Sansik:Window(props)
                 end
             end)
 
-            -- === Список создаётся на уровне Page (НЕ внутри dropdown) ===
+            -- === Список на DropdownLayer (поверх всего окна) ===
             local list = Instance.new("Frame")
-            list.Name = "DropdownList_" .. (props.name or "Unnamed") .. "_" .. tostring(math.random(1000, 9999))
+            list.Name = "DropdownList"
             list.Size = UDim2.new(0, 0, 0, 0)
             list.Position = UDim2.new(0, 0, 0, 0)
             list.BackgroundColor3 = Sansik.Theme.DropdownBackground
             list.BorderSizePixel = 0
             list.Visible = false
             list.ClipsDescendants = true
-            list.ZIndex = 100
-            list.Parent = Page
+            list.ZIndex = 501
+            list.Parent = DropdownLayer
             corner(list, 10)
             stroke(list, Sansik.Theme.ElementStroke, 1, 0.5)
 
             local function updateListPosition()
-                list.Position = UDim2.new(0, dropdown.AbsolutePosition.X - Page.AbsolutePosition.X, 0, dropdown.AbsolutePosition.Y - Page.AbsolutePosition.Y + dropdown.AbsoluteSize.Y + 4)
+                -- Абсолютная позиция dropdown относительно Main
+                local dropdownAbs = dropdown.AbsolutePosition
+                local mainAbs = Main.AbsolutePosition
+                local relX = dropdownAbs.X - mainAbs.X
+                local relY = dropdownAbs.Y - mainAbs.Y + dropdown.AbsoluteSize.Y + 4
+                list.Position = UDim2.new(0, relX, 0, relY)
                 list.Size = UDim2.new(0, dropdown.AbsoluteSize.X, 0, 0)
             end
 
@@ -1063,7 +1089,7 @@ function Sansik:Window(props)
             searchBox.PlaceholderColor3 = Sansik.Theme.TextSecondary
             searchBox.TextXAlignment = Enum.TextXAlignment.Left
             searchBox.ClearTextOnFocus = false
-            searchBox.ZIndex = 101
+            searchBox.ZIndex = 502
             searchBox.Parent = list
             corner(searchBox, 6)
             local searchPadding = Instance.new("UIPadding")
@@ -1080,7 +1106,7 @@ function Sansik:Window(props)
             optionsScroll.ScrollBarImageColor3 = Sansik.Theme.ElementStroke
             optionsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
             optionsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-            optionsScroll.ZIndex = 101
+            optionsScroll.ZIndex = 502
             optionsScroll.Parent = list
 
             local optionsLayout = Instance.new("UIListLayout")
@@ -1102,6 +1128,9 @@ function Sansik:Window(props)
                 tween(list, 0.2, {Size = UDim2.new(0, dropdown.AbsoluteSize.X, 0, 0), BackgroundTransparency = 1})
                 task.wait(0.2)
                 list.Visible = false
+                if openDropdownList == list then
+                    openDropdownList = nil
+                end
                 tween(dropdown, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackground})
             end
 
@@ -1113,7 +1142,7 @@ function Sansik:Window(props)
                 optionBtn.BorderSizePixel = 0
                 optionBtn.Text = ""
                 optionBtn.AutoButtonColor = false
-                optionBtn.ZIndex = 102
+                optionBtn.ZIndex = 503
                 optionBtn.Parent = optionsScroll
                 corner(optionBtn, 6)
 
@@ -1122,7 +1151,7 @@ function Sansik:Window(props)
                 optIcon.Position = UDim2.new(0, 12, 0.5, -7)
                 optIcon.BackgroundTransparency = 1
                 optIcon.ImageColor3 = Sansik.Theme.TextSecondary
-                optIcon.ZIndex = 103
+                optIcon.ZIndex = 504
                 optIcon.Parent = optionBtn
 
                 local sqIco = getIcon("square")
@@ -1141,7 +1170,7 @@ function Sansik:Window(props)
                 optLabel.TextXAlignment = Enum.TextXAlignment.Left
                 optLabel.Position = UDim2.new(0, 36, 0, 0)
                 optLabel.Size = UDim2.new(1, -48, 1, 0)
-                optLabel.ZIndex = 103
+                optLabel.ZIndex = 504
                 optLabel.Parent = optionBtn
 
                 optionBtn.MouseEnter:Connect(function()
@@ -1182,12 +1211,10 @@ function Sansik:Window(props)
                 if isOpen then
                     closeList()
                 else
-                    -- Закрыть все другие открытые списки
-                    for _, other in ipairs(Page:GetChildren()) do
-                        if other.Name:find("DropdownList_") and other ~= list then
-                            other.Visible = false
-                            other.Size = UDim2.new(0, 0, 0, 0)
-                        end
+                    -- Закрыть другие открытые
+                    if openDropdownList and openDropdownList ~= list then
+                        openDropdownList.Visible = false
+                        openDropdownList.Size = UDim2.new(0, 0, 0, 0)
                     end
 
                     dropdown:SetAttribute("Open", true)
@@ -1195,7 +1222,15 @@ function Sansik:Window(props)
                     updateListPosition()
                     list.Visible = true
                     list.BackgroundTransparency = 1
+                    openDropdownList = list
                     tween(list, 0.25, {Size = UDim2.new(0, dropdown.AbsoluteSize.X, 0, 200), BackgroundTransparency = 0})
+                end
+            end)
+
+            -- Если Page скрывается, список тоже
+            Page:GetPropertyChangedSignal("Visible"):Connect(function()
+                if not Page.Visible and list.Visible then
+                    list.Visible = false
                 end
             end)
 
@@ -1265,6 +1300,10 @@ function Sansik:Window(props)
     MinimizeBtn.MouseButton1Click:Connect(function()
         Minimized = not Minimized
         if Minimized then
+            if openDropdownList then
+                openDropdownList.Visible = false
+                openDropdownList = nil
+            end
             setContentVisible(false)
             tween(Main, 0.35, {Size = UDim2.new(0, 600, 0, 56)})
         else
