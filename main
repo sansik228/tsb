@@ -1,5 +1,5 @@
--- Sansik UI Library v3.3
--- Profile aligned to bottom of sidebar
+-- Sansik UI Library v3.5
+-- Toggle with outline style (no background fill)
 
 local Sansik = {}
 Sansik.Flags = {}
@@ -20,8 +20,10 @@ Sansik.Theme = {
     ElementStroke = Color3.fromRGB(45, 45, 55),
     SliderBackground = Color3.fromRGB(50, 50, 58),
     SliderProgress = Color3.fromRGB(0, 180, 120),
-    ToggleEnabled = Color3.fromRGB(255, 255, 255),
+    ToggleEnabled = Color3.fromRGB(0, 180, 120),
+    ToggleEnabledStroke = Color3.fromRGB(0, 220, 150),
     ToggleDisabled = Color3.fromRGB(60, 60, 70),
+    ToggleDisabledStroke = Color3.fromRGB(80, 80, 90),
     NotificationBackground = Color3.fromRGB(22, 22, 26),
     Accent = Color3.fromRGB(0, 200, 130),
 }
@@ -324,7 +326,7 @@ function Sansik:Window(props)
     TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
     TabListLayout.Parent = TabList
 
-    -- ============ ПРОФИЛЬ (прижат к низу сайдбара) ============
+    -- ============ ПРОФИЛЬ ============
     local Profile = Instance.new("Frame")
     Profile.Name = "Profile"
     Profile.Size = UDim2.new(1, 0, 0, 56)
@@ -334,8 +336,7 @@ function Sansik:Window(props)
     Profile.ZIndex = 2
     Profile.Parent = Sidebar
     corner(Profile, 10)
-    
-    -- Фикс верхних углов profile (чтобы не перекрывал sidebar)
+
     local ProfileTopFix = Instance.new("Frame")
     ProfileTopFix.Name = "TopFix"
     ProfileTopFix.Size = UDim2.new(1, 0, 0, 10)
@@ -743,7 +744,7 @@ function Sansik:Window(props)
             }
         end
 
-        -- ============ TOGGLE ============
+        -- ============ TOGGLE (outline style) ============
         function Tab:Toggle(props)
             local toggle = baseElement(46)
             toggle.Name = props.name or "Toggle"
@@ -770,14 +771,16 @@ function Sansik:Window(props)
             desc.Size = UDim2.new(1, -80, 0, 14)
             desc.Parent = toggle
 
+            -- Switch: прозрачный фон, только stroke
             local switchBg = Instance.new("Frame")
             switchBg.Name = "SwitchBg"
             switchBg.Size = UDim2.new(0, 48, 0, 26)
             switchBg.Position = UDim2.new(1, -62, 0.5, -13)
-            switchBg.BackgroundColor3 = Sansik.Theme.ToggleDisabled
+            switchBg.BackgroundTransparency = 1
             switchBg.BorderSizePixel = 0
             switchBg.Parent = toggle
             corner(switchBg, 13)
+            local switchStroke = stroke(switchBg, Sansik.Theme.ToggleDisabledStroke, 1.5, 0)
 
             local indicator = Instance.new("Frame")
             indicator.Name = "Indicator"
@@ -792,11 +795,11 @@ function Sansik:Window(props)
 
             local function updateSwitch(animated)
                 if state then
-                    tween(switchBg, animated and 0.2 or 0, {BackgroundColor3 = Sansik.Theme.ToggleEnabled})
-                    tween(indicator, animated and 0.2 or 0, {Position = UDim2.new(1, -23, 0.5, -10)})
+                    tween(switchStroke, animated and 0.2 or 0, {Color = Sansik.Theme.ToggleEnabledStroke, Transparency = 0.2})
+                    tween(indicator, animated and 0.2 or 0, {BackgroundColor3 = Sansik.Theme.ToggleEnabled, Position = UDim2.new(1, -23, 0.5, -10)})
                 else
-                    tween(switchBg, animated and 0.2 or 0, {BackgroundColor3 = Sansik.Theme.ToggleDisabled})
-                    tween(indicator, animated and 0.2 or 0, {Position = UDim2.new(0, 3, 0.5, -10)})
+                    tween(switchStroke, animated and 0.2 or 0, {Color = Sansik.Theme.ToggleDisabledStroke, Transparency = 0})
+                    tween(indicator, animated and 0.2 or 0, {BackgroundColor3 = Color3.fromRGB(255, 255, 255), Position = UDim2.new(0, 3, 0.5, -10)})
                 end
             end
             updateSwitch(false)
