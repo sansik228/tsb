@@ -1,5 +1,5 @@
--- Sansik UI Library v2.1
--- Sidebar layout, fixed corners
+-- Sansik UI Library v2.2
+-- Sidebar layout, fixed corners (all 4)
 
 local Sansik = {}
 Sansik.Flags = {}
@@ -84,7 +84,6 @@ local function tween(obj, time, props, style, dir)
     ):Play()
 end
 
--- ВАЖНО: corner ПЕРЕД stroke
 local function corner(parent, radius)
     local existing = parent:FindFirstChildOfClass("UICorner")
     if existing then existing:Destroy() end
@@ -104,12 +103,6 @@ local function stroke(parent, color, thickness, transparency)
     s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     s.Parent = parent
     return s
-end
-
--- Утилита: сразу corner + stroke
-local function decorate(parent, radius, strokeColor, strokeTransparency)
-    corner(parent, radius)
-    stroke(parent, strokeColor or Sansik.Theme.ElementStroke, 1, strokeTransparency or 0.5)
 end
 
 local function makeDraggable(frame, dragFrame)
@@ -169,11 +162,12 @@ function Sansik:Window(props)
     Main.BackgroundColor3 = Sansik.Theme.Background
     Main.BorderSizePixel = 0
     Main.Active = true
-    Main.ClipsDescendants = true
+    Main.ClipsDescendants = false
     Main.Parent = ScreenGui
     corner(Main, 14)
     stroke(Main, Sansik.Theme.ElementStroke, 1, 0.6)
 
+    -- Тень
     local Shadow = Instance.new("ImageLabel")
     Shadow.Name = "Shadow"
     Shadow.Size = UDim2.new(1, 40, 1, 40)
@@ -282,13 +276,14 @@ function Sansik:Window(props)
     -- ============ SIDEBAR ============
     local Sidebar = Instance.new("Frame")
     Sidebar.Name = "Sidebar"
-    Sidebar.Size = UDim2.new(0, 180, 1, -56)
+    Sidebar.Size = UDim2.new(0, 180, 1, -70)
     Sidebar.Position = UDim2.new(0, 0, 0, 56)
     Sidebar.BackgroundColor3 = Sansik.Theme.Sidebar
     Sidebar.BorderSizePixel = 0
     Sidebar.Parent = Main
+    corner(Sidebar, 14)
 
-    -- Фикс верхнего левого угла sidebar (чтобы не торчал под topbar)
+    -- Фикс верхнего левого угла sidebar
     local SidebarCornerFix = Instance.new("Frame")
     SidebarCornerFix.Name = "CornerFix"
     SidebarCornerFix.Size = UDim2.new(0, 14, 0, 14)
@@ -298,6 +293,16 @@ function Sansik:Window(props)
     SidebarCornerFix.ZIndex = 1
     SidebarCornerFix.Parent = Sidebar
 
+    -- Фикс верхнего правого угла sidebar (чтобы не перекрывал topbar)
+    local SidebarTopRightFix = Instance.new("Frame")
+    SidebarTopRightFix.Name = "TopRightFix"
+    SidebarTopRightFix.Size = UDim2.new(0, 14, 0, 14)
+    SidebarTopRightFix.Position = UDim2.new(1, -14, 0, 0)
+    SidebarTopRightFix.BackgroundColor3 = Sansik.Theme.Topbar
+    SidebarTopRightFix.BorderSizePixel = 0
+    SidebarTopRightFix.ZIndex = 1
+    SidebarTopRightFix.Parent = Sidebar
+
     local SidebarDivider = Instance.new("Frame")
     SidebarDivider.Name = "Divider"
     SidebarDivider.Size = UDim2.new(0, 1, 1, 0)
@@ -305,6 +310,7 @@ function Sansik:Window(props)
     SidebarDivider.BackgroundColor3 = Sansik.Theme.ElementStroke
     SidebarDivider.BorderSizePixel = 0
     SidebarDivider.BackgroundTransparency = 0.5
+    SidebarDivider.ZIndex = 2
     SidebarDivider.Parent = Sidebar
 
     local TabList = Instance.new("Frame")
@@ -326,6 +332,7 @@ function Sansik:Window(props)
     Profile.Position = UDim2.new(0, 8, 1, -64)
     Profile.BackgroundColor3 = Sansik.Theme.TabBackground
     Profile.BorderSizePixel = 0
+    Profile.ZIndex = 2
     Profile.Parent = Sidebar
     corner(Profile, 10)
 
@@ -367,8 +374,8 @@ function Sansik:Window(props)
     -- ============ CONTENT ============
     local Content = Instance.new("ScrollingFrame")
     Content.Name = "Content"
-    Content.Size = UDim2.new(1, -200, 1, -72)
-    Content.Position = UDim2.new(0, 188, 0, 64)
+    Content.Size = UDim2.new(1, -204, 1, -86)
+    Content.Position = UDim2.new(0, 192, 0, 64)
     Content.BackgroundTransparency = 1
     Content.BorderSizePixel = 0
     Content.ScrollBarThickness = 3
@@ -376,6 +383,27 @@ function Sansik:Window(props)
     Content.CanvasSize = UDim2.new(0, 0, 0, 0)
     Content.AutomaticCanvasSize = Enum.AutomaticSize.Y
     Content.Parent = Main
+
+    -- ============ ФИКСЫ НИЖНИХ УГЛОВ MAIN ============
+    local BottomLeftFix = Instance.new("Frame")
+    BottomLeftFix.Name = "BottomLeftFix"
+    BottomLeftFix.Size = UDim2.new(0, 14, 0, 14)
+    BottomLeftFix.Position = UDim2.new(0, 0, 1, -14)
+    BottomLeftFix.BackgroundColor3 = Sansik.Theme.Sidebar
+    BottomLeftFix.BorderSizePixel = 0
+    BottomLeftFix.ZIndex = 5
+    BottomLeftFix.Parent = Main
+    corner(BottomLeftFix, 14)
+
+    local BottomRightFix = Instance.new("Frame")
+    BottomRightFix.Name = "BottomRightFix"
+    BottomRightFix.Size = UDim2.new(0, 14, 0, 14)
+    BottomRightFix.Position = UDim2.new(1, -14, 1, -14)
+    BottomRightFix.BackgroundColor3 = Sansik.Theme.Background
+    BottomRightFix.BorderSizePixel = 0
+    BottomRightFix.ZIndex = 5
+    BottomRightFix.Parent = Main
+    corner(BottomRightFix, 14)
 
     makeDraggable(Main, Topbar)
 
@@ -546,7 +574,6 @@ function Sansik:Window(props)
             select()
         end
 
-        -- Tab object
         local Tab = {}
         local elementOrder = 0
 
@@ -567,7 +594,6 @@ function Sansik:Window(props)
             return frame
         end
 
-        -- ============ BUTTON ============
         function Tab:Button(props)
             local btn = baseElement(44)
             btn.Name = props.name or "Button"
@@ -607,7 +633,6 @@ function Sansik:Window(props)
             }
         end
 
-        -- ============ SECTION ============
         function Tab:Section(props)
             local section = Instance.new("Frame")
             section.Name = "Section"
