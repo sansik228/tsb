@@ -1,5 +1,5 @@
--- Sansik UI Library v2.2
--- Sidebar layout, fixed corners (all 4)
+-- Sansik UI Library v2.3
+-- Sidebar layout, fixed corners, new notifications
 
 local Sansik = {}
 Sansik.Flags = {}
@@ -57,6 +57,9 @@ local FallbackIcons = {
     settings = "rbxassetid://10709791120",
     minus = "rbxassetid://10709789939",
     x = "rbxassetid://10709794675",
+    check = "rbxassetid://10709788428",
+    info = "rbxassetid://10709790910",
+    ["alert-triangle"] = "rbxassetid://10709787142",
 }
 
 local function getIcon(name)
@@ -167,7 +170,6 @@ function Sansik:Window(props)
     corner(Main, 14)
     stroke(Main, Sansik.Theme.ElementStroke, 1, 0.6)
 
-    -- Тень
     local Shadow = Instance.new("ImageLabel")
     Shadow.Name = "Shadow"
     Shadow.Size = UDim2.new(1, 40, 1, 40)
@@ -191,7 +193,6 @@ function Sansik:Window(props)
     Topbar.Parent = Main
     corner(Topbar, 14)
 
-    -- Фикс нижних углов topbar
     local TopbarBottomFix = Instance.new("Frame")
     TopbarBottomFix.Name = "BottomFix"
     TopbarBottomFix.Size = UDim2.new(1, 0, 0, 14)
@@ -283,7 +284,6 @@ function Sansik:Window(props)
     Sidebar.Parent = Main
     corner(Sidebar, 14)
 
-    -- Фикс верхнего левого угла sidebar
     local SidebarCornerFix = Instance.new("Frame")
     SidebarCornerFix.Name = "CornerFix"
     SidebarCornerFix.Size = UDim2.new(0, 14, 0, 14)
@@ -293,7 +293,6 @@ function Sansik:Window(props)
     SidebarCornerFix.ZIndex = 1
     SidebarCornerFix.Parent = Sidebar
 
-    -- Фикс верхнего правого угла sidebar (чтобы не перекрывал topbar)
     local SidebarTopRightFix = Instance.new("Frame")
     SidebarTopRightFix.Name = "TopRightFix"
     SidebarTopRightFix.Size = UDim2.new(0, 14, 0, 14)
@@ -384,7 +383,7 @@ function Sansik:Window(props)
     Content.AutomaticCanvasSize = Enum.AutomaticSize.Y
     Content.Parent = Main
 
-    -- ============ ФИКСЫ НИЖНИХ УГЛОВ MAIN ============
+    -- Фиксы нижних углов Main
     local BottomLeftFix = Instance.new("Frame")
     BottomLeftFix.Name = "BottomLeftFix"
     BottomLeftFix.Size = UDim2.new(0, 14, 0, 14)
@@ -427,8 +426,10 @@ function Sansik:Window(props)
 
     function Window:Notify(props)
         props = props or {}
+        local duration = props.duration or 4
 
         local notif = Instance.new("Frame")
+        notif.Name = "Notification"
         notif.Size = UDim2.new(1, 0, 0, 0)
         notif.BackgroundColor3 = Sansik.Theme.NotificationBackground
         notif.BorderSizePixel = 0
@@ -438,16 +439,54 @@ function Sansik:Window(props)
         corner(notif, 10)
         stroke(notif, Sansik.Theme.ElementStroke, 1, 0.5)
 
+        local accentBar = Instance.new("Frame")
+        accentBar.Name = "AccentBar"
+        accentBar.Size = UDim2.new(0, 3, 1, -16)
+        accentBar.Position = UDim2.new(0, 8, 0, 8)
+        accentBar.BackgroundColor3 = props.accent or Sansik.Theme.Accent
+        accentBar.BorderSizePixel = 0
+        accentBar.ZIndex = 2
+        accentBar.Parent = notif
+        corner(accentBar, 2)
+
+        local iconFrame = Instance.new("Frame")
+        iconFrame.Name = "IconFrame"
+        iconFrame.Size = UDim2.new(0, 28, 0, 28)
+        iconFrame.Position = UDim2.new(0, 18, 0, 14)
+        iconFrame.BackgroundColor3 = props.accent or Sansik.Theme.Accent
+        iconFrame.BackgroundTransparency = 0.85
+        iconFrame.BorderSizePixel = 0
+        iconFrame.ZIndex = 2
+        iconFrame.Parent = notif
+        corner(iconFrame, 8)
+
+        local iconImg = Instance.new("ImageLabel")
+        iconImg.Size = UDim2.new(0, 16, 0, 16)
+        iconImg.Position = UDim2.new(0.5, -8, 0.5, -8)
+        iconImg.BackgroundTransparency = 1
+        iconImg.ImageColor3 = props.accent or Sansik.Theme.Accent
+        iconImg.ZIndex = 3
+        iconImg.Parent = iconFrame
+
+        local iconName = props.icon or "info"
+        local ico = getIcon(iconName)
+        if ico then
+            iconImg.Image = ico.id
+            if ico.rectOffset then iconImg.ImageRectOffset = ico.rectOffset end
+            if ico.rectSize then iconImg.ImageRectSize = ico.rectSize end
+        end
+
         local NotifTitle = Instance.new("TextLabel")
         NotifTitle.Text = props.title or "Notification"
-        NotifTitle.Font = Enum.Font.GothamMedium
+        NotifTitle.Font = Enum.Font.GothamBold
         NotifTitle.TextSize = 13
         NotifTitle.TextColor3 = Sansik.Theme.TextColor
         NotifTitle.BackgroundTransparency = 1
         NotifTitle.TextXAlignment = Enum.TextXAlignment.Left
-        NotifTitle.Position = UDim2.new(0, 12, 0, 8)
-        NotifTitle.Size = UDim2.new(1, -24, 0, 16)
+        NotifTitle.Position = UDim2.new(0, 58, 0, 12)
+        NotifTitle.Size = UDim2.new(1, -100, 0, 16)
         NotifTitle.TextTransparency = 1
+        NotifTitle.ZIndex = 2
         NotifTitle.Parent = notif
 
         local NotifContent = Instance.new("TextLabel")
@@ -458,22 +497,74 @@ function Sansik:Window(props)
         NotifContent.BackgroundTransparency = 1
         NotifContent.TextXAlignment = Enum.TextXAlignment.Left
         NotifContent.TextWrapped = true
-        NotifContent.Position = UDim2.new(0, 12, 0, 26)
-        NotifContent.Size = UDim2.new(1, -24, 0, 30)
+        NotifContent.TextYAlignment = Enum.TextYAlignment.Top
+        NotifContent.Position = UDim2.new(0, 58, 0, 32)
+        NotifContent.Size = UDim2.new(1, -70, 0, 30)
         NotifContent.TextTransparency = 1
+        NotifContent.ZIndex = 2
         NotifContent.Parent = notif
 
-        tween(notif, 0.3, {Size = UDim2.new(1, 0, 0, 60), BackgroundTransparency = 0.1})
+        local closeBtn = Instance.new("TextButton")
+        closeBtn.Name = "CloseBtn"
+        closeBtn.Size = UDim2.new(0, 20, 0, 20)
+        closeBtn.Position = UDim2.new(1, -28, 0, 10)
+        closeBtn.BackgroundTransparency = 1
+        closeBtn.Text = "✕"
+        closeBtn.Font = Enum.Font.GothamBold
+        closeBtn.TextSize = 12
+        closeBtn.TextColor3 = Sansik.Theme.TextSecondary
+        closeBtn.TextTransparency = 1
+        closeBtn.AutoButtonColor = false
+        closeBtn.ZIndex = 3
+        closeBtn.Parent = notif
+        corner(closeBtn, 4)
+
+        local progressBg = Instance.new("Frame")
+        progressBg.Name = "ProgressBg"
+        progressBg.Size = UDim2.new(1, -16, 0, 2)
+        progressBg.Position = UDim2.new(0, 8, 1, -8)
+        progressBg.BackgroundColor3 = Sansik.Theme.ElementStroke
+        progressBg.BorderSizePixel = 0
+        progressBg.BackgroundTransparency = 0.6
+        progressBg.ZIndex = 2
+        progressBg.Parent = notif
+        corner(progressBg, 1)
+
+        local progressFill = Instance.new("Frame")
+        progressFill.Name = "ProgressFill"
+        progressFill.Size = UDim2.new(1, 0, 1, 0)
+        progressFill.BackgroundColor3 = props.accent or Sansik.Theme.Accent
+        progressFill.BorderSizePixel = 0
+        progressFill.ZIndex = 3
+        progressFill.Parent = progressBg
+        corner(progressFill, 1)
+
+        tween(notif, 0.35, {Size = UDim2.new(1, 0, 0, 72), BackgroundTransparency = 0.1})
         tween(NotifTitle, 0.25, {TextTransparency = 0})
         tween(NotifContent, 0.25, {TextTransparency = 0.2})
+        tween(closeBtn, 0.25, {TextTransparency = 0.3})
+        tween(progressFill, duration, {Size = UDim2.new(0, 0, 1, 0)}, Enum.EasingStyle.Linear)
 
-        task.delay(props.duration or 4, function()
+        closeBtn.MouseEnter:Connect(function()
+            tween(closeBtn, 0.15, {TextColor3 = Sansik.Theme.TextColor, TextTransparency = 0, BackgroundTransparency = 0.85})
+        end)
+        closeBtn.MouseLeave:Connect(function()
+            tween(closeBtn, 0.15, {TextColor3 = Sansik.Theme.TextSecondary, TextTransparency = 0.3, BackgroundTransparency = 1})
+        end)
+
+        local function dismiss()
             tween(notif, 0.3, {Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1})
             tween(NotifTitle, 0.2, {TextTransparency = 1})
             tween(NotifContent, 0.2, {TextTransparency = 1})
+            tween(closeBtn, 0.2, {TextTransparency = 1})
+            tween(iconFrame, 0.2, {BackgroundTransparency = 1})
+            tween(iconImg, 0.2, {ImageTransparency = 1})
             task.wait(0.35)
             notif:Destroy()
-        end)
+        end
+
+        closeBtn.MouseButton1Click:Connect(dismiss)
+        task.delay(duration, dismiss)
     end
 
     -- ============ TAB ============
@@ -594,6 +685,7 @@ function Sansik:Window(props)
             return frame
         end
 
+        -- ============ BUTTON ============
         function Tab:Button(props)
             local btn = baseElement(44)
             btn.Name = props.name or "Button"
@@ -633,6 +725,7 @@ function Sansik:Window(props)
             }
         end
 
+        -- ============ SECTION ============
         function Tab:Section(props)
             local section = Instance.new("Frame")
             section.Name = "Section"
