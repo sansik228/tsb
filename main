@@ -1,5 +1,5 @@
--- Sansik UI Library v3.1
--- Slider styled like Rayfield Gen2
+-- Sansik UI Library v3.2
+-- Matched to Gen2 reference
 
 local Sansik = {}
 Sansik.Flags = {}
@@ -627,7 +627,7 @@ function Sansik:Window(props)
         Page.Parent = Content
 
         local PageLayout = Instance.new("UIListLayout")
-        PageLayout.Padding = UDim.new(0, 8)
+        PageLayout.Padding = UDim.new(0, 6)
         PageLayout.SortOrder = Enum.SortOrder.LayoutOrder
         PageLayout.Parent = Page
 
@@ -705,9 +705,7 @@ function Sansik:Window(props)
             label.TextXAlignment = Enum.TextXAlignment.Left
             label.Position = UDim2.new(0, 14, 0, 0)
             label.Size = UDim2.new(1, -28, 1, 0)
-            label.Parent = btn
-
-            btn.MouseEnter:Connect(function()
+            label.Parent = btn            btn.MouseEnter:Connect(function()
                 tween(btn, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackgroundHover})
             end)
             btn.MouseLeave:Connect(function()
@@ -733,7 +731,7 @@ function Sansik:Window(props)
 
         -- ============ TOGGLE ============
         function Tab:Toggle(props)
-            local toggle = baseElement(48)
+            local toggle = baseElement(46)
             toggle.Name = props.name or "Toggle"
 
             local label = Instance.new("TextLabel")
@@ -744,7 +742,7 @@ function Sansik:Window(props)
             label.BackgroundTransparency = 1
             label.TextXAlignment = Enum.TextXAlignment.Left
             label.Position = UDim2.new(0, 14, 0, 6)
-            label.Size = UDim2.new(1, -80, 0, 18)
+            label.Size = UDim2.new(1, -80, 0, 16)
             label.Parent = toggle
 
             local desc = Instance.new("TextLabel")
@@ -754,37 +752,37 @@ function Sansik:Window(props)
             desc.TextColor3 = Sansik.Theme.TextSecondary
             desc.BackgroundTransparency = 1
             desc.TextXAlignment = Enum.TextXAlignment.Left
-            desc.Position = UDim2.new(0, 14, 0, 26)
-            desc.Size = UDim2.new(1, -80, 0, 16)
+            desc.Position = UDim2.new(0, 14, 0, 24)
+            desc.Size = UDim2.new(1, -80, 0, 14)
             desc.Parent = toggle
 
             local switchBg = Instance.new("Frame")
             switchBg.Name = "SwitchBg"
-            switchBg.Size = UDim2.new(0, 44, 0, 24)
-            switchBg.Position = UDim2.new(1, -58, 0.5, -12)
+            switchBg.Size = UDim2.new(0, 48, 0, 26)
+            switchBg.Position = UDim2.new(1, -62, 0.5, -13)
             switchBg.BackgroundColor3 = Sansik.Theme.ToggleDisabled
             switchBg.BorderSizePixel = 0
             switchBg.Parent = toggle
-            corner(switchBg, 12)
+            corner(switchBg, 13)
 
             local indicator = Instance.new("Frame")
             indicator.Name = "Indicator"
-            indicator.Size = UDim2.new(0, 18, 0, 18)
-            indicator.Position = UDim2.new(0, 3, 0.5, -9)
+            indicator.Size = UDim2.new(0, 20, 0, 20)
+            indicator.Position = UDim2.new(0, 3, 0.5, -10)
             indicator.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             indicator.BorderSizePixel = 0
             indicator.Parent = switchBg
-            corner(indicator, 9)
+            corner(indicator, 10)
 
             local state = props.value or false
 
             local function updateSwitch(animated)
                 if state then
                     tween(switchBg, animated and 0.2 or 0, {BackgroundColor3 = Sansik.Theme.ToggleEnabled})
-                    tween(indicator, animated and 0.2 or 0, {Position = UDim2.new(1, -21, 0.5, -9)})
+                    tween(indicator, animated and 0.2 or 0, {Position = UDim2.new(1, -23, 0.5, -10)})
                 else
                     tween(switchBg, animated and 0.2 or 0, {BackgroundColor3 = Sansik.Theme.ToggleDisabled})
-                    tween(indicator, animated and 0.2 or 0, {Position = UDim2.new(0, 3, 0.5, -9)})
+                    tween(indicator, animated and 0.2 or 0, {Position = UDim2.new(0, 3, 0.5, -10)})
                 end
             end
             updateSwitch(false)
@@ -828,10 +826,9 @@ function Sansik:Window(props)
 
         -- ============ SLIDER (Gen2 style) ============
         function Tab:Slider(props)
-            local slider = baseElement(64)
+            local slider = baseElement(56)
             slider.Name = props.name or "Slider"
 
-            -- Название
             local label = Instance.new("TextLabel")
             label.Text = props.name or "Slider"
             label.Font = Enum.Font.GothamMedium
@@ -839,51 +836,49 @@ function Sansik:Window(props)
             label.TextColor3 = Sansik.Theme.TextColor
             label.BackgroundTransparency = 1
             label.TextXAlignment = Enum.TextXAlignment.Left
-            label.Position = UDim2.new(0, 14, 0, 10)
-            label.Size = UDim2.new(0.5, 0, 0, 18)
+            label.Position = UDim2.new(0, 14, 0, 8)
+            label.Size = UDim2.new(0.5, 0, 0, 16)
             label.Parent = slider
 
-            -- Значение с суффиксом
             local valueLabel = Instance.new("TextLabel")
             valueLabel.Text = tostring(props.value or props.range[1]) .. (props.suffix and (" " .. props.suffix) or "")
             valueLabel.Font = Enum.Font.Gotham
-            valueLabel.TextSize = 12
+            valueLabel.TextSize = 11
             valueLabel.TextColor3 = Sansik.Theme.TextSecondary
             valueLabel.BackgroundTransparency = 1
             valueLabel.TextXAlignment = Enum.TextXAlignment.Left
-            valueLabel.Position = UDim2.new(0, 14, 0, 30)
-            valueLabel.Size = UDim2.new(0.5, 0, 0, 16)
+            valueLabel.Position = UDim2.new(0, 14, 0, 28)
+            valueLabel.Size = UDim2.new(0.5, 0, 0, 14)
             valueLabel.Parent = slider
 
-            -- Трек
+            -- Трек с knob внутри (pill)
             local track = Instance.new("Frame")
             track.Name = "Track"
-            track.Size = UDim2.new(0, 240, 0, 10)
-            track.Position = UDim2.new(1, -254, 0.5, -5)
+            track.Size = UDim2.new(0, 240, 0, 8)
+            track.Position = UDim2.new(1, -254, 0.5, -4)
             track.BackgroundColor3 = Sansik.Theme.SliderBackground
             track.BorderSizePixel = 0
             track.Parent = slider
-            corner(track, 5)
+            corner(track, 4)
 
-            -- Заполнение (зелёное)
             local fill = Instance.new("Frame")
             fill.Name = "Fill"
             fill.Size = UDim2.new(0, 0, 1, 0)
             fill.BackgroundColor3 = Sansik.Theme.SliderProgress
             fill.BorderSizePixel = 0
             fill.Parent = track
-            corner(fill, 5)
+            corner(fill, 4)
 
-            -- Knob (белый, круглый)
+            -- Pill-образный knob (вытянутый)
             local knob = Instance.new("Frame")
             knob.Name = "Knob"
-            knob.Size = UDim2.new(0, 22, 0, 22)
-            knob.Position = UDim2.new(0, 0, 0.5, -11)
+            knob.Size = UDim2.new(0, 26, 0, 16)
+            knob.Position = UDim2.new(0, 0, 0.5, -8)
             knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             knob.BorderSizePixel = 0
             knob.ZIndex = 2
             knob.Parent = track
-            corner(knob, 11)
+            corner(knob, 8)
 
             local min = props.range[1]
             local max = props.range[2]
@@ -894,7 +889,7 @@ function Sansik:Window(props)
                 currentValue = math.clamp(v, min, max)
                 local percent = (currentValue - min) / (max - min)
                 tween(fill, animated and 0.08 or 0, {Size = UDim2.new(percent, 0, 1, 0)})
-                tween(knob, animated and 0.08 or 0, {Position = UDim2.new(percent, -11, 0.5, -11)})
+                tween(knob, animated and 0.08 or 0, {Position = UDim2.new(percent, -13, 0.5, -8)})
                 valueLabel.Text = tostring(currentValue) .. (props.suffix and (" " .. props.suffix) or "")
                 if props.flag then Sansik.Flags[props.flag] = currentValue end
                 if not silent and props.callback then pcall(props.callback, currentValue) end
@@ -908,7 +903,7 @@ function Sansik:Window(props)
             trackBtn.Text = ""
             trackBtn.AutoButtonColor = false
             trackBtn.Parent = track
-            corner(trackBtn, 5)
+            corner(trackBtn, 4)
 
             local function updateFromInput(input)
                 local relativeX = input.Position.X - track.AbsolutePosition.X
@@ -953,7 +948,7 @@ function Sansik:Window(props)
         function Tab:Section(props)
             local section = Instance.new("Frame")
             section.Name = "Section"
-            section.Size = UDim2.new(1, 0, 0, 24)
+            section.Size = UDim2.new(1, 0, 0, 22)
             section.BackgroundTransparency = 1
             section.LayoutOrder = nextOrder()
             section.Parent = Page
