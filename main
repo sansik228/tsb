@@ -1,5 +1,5 @@
--- Sansik UI Library v2.3
--- Sidebar layout, fixed corners, new notifications
+-- Sansik UI Library v2.4
+-- Fixed minimized state + notification close button
 
 local Sansik = {}
 Sansik.Flags = {}
@@ -383,7 +383,6 @@ function Sansik:Window(props)
     Content.AutomaticCanvasSize = Enum.AutomaticSize.Y
     Content.Parent = Main
 
-    -- Фиксы нижних углов Main
     local BottomLeftFix = Instance.new("Frame")
     BottomLeftFix.Name = "BottomLeftFix"
     BottomLeftFix.Size = UDim2.new(0, 14, 0, 14)
@@ -504,20 +503,25 @@ function Sansik:Window(props)
         NotifContent.ZIndex = 2
         NotifContent.Parent = notif
 
-        local closeBtn = Instance.new("TextButton")
+        -- Кнопка закрытия (иконка, как в топбаре)
+        local closeBtn = Instance.new("ImageButton")
         closeBtn.Name = "CloseBtn"
-        closeBtn.Size = UDim2.new(0, 20, 0, 20)
-        closeBtn.Position = UDim2.new(1, -28, 0, 10)
+        closeBtn.Size = UDim2.new(0, 22, 0, 22)
+        closeBtn.Position = UDim2.new(1, -30, 0, 10)
         closeBtn.BackgroundTransparency = 1
-        closeBtn.Text = "✕"
-        closeBtn.Font = Enum.Font.GothamBold
-        closeBtn.TextSize = 12
-        closeBtn.TextColor3 = Sansik.Theme.TextSecondary
-        closeBtn.TextTransparency = 1
-        closeBtn.AutoButtonColor = false
-        closeBtn.ZIndex = 3
+        closeBtn.Image = ""
+        closeBtn.ZIndex = 4
         closeBtn.Parent = notif
-        corner(closeBtn, 4)
+        corner(closeBtn, 6)
+
+        local closeIco = getIcon("x")
+        if closeIco then
+            closeBtn.Image = closeIco.id
+            if closeIco.rectOffset then closeBtn.ImageRectOffset = closeIco.rectOffset end
+            if closeIco.rectSize then closeBtn.ImageRectSize = closeIco.rectSize end
+            closeBtn.ImageColor3 = Sansik.Theme.TextSecondary
+        end
+        closeBtn.ImageTransparency = 1
 
         local progressBg = Instance.new("Frame")
         progressBg.Name = "ProgressBg"
@@ -542,21 +546,24 @@ function Sansik:Window(props)
         tween(notif, 0.35, {Size = UDim2.new(1, 0, 0, 72), BackgroundTransparency = 0.1})
         tween(NotifTitle, 0.25, {TextTransparency = 0})
         tween(NotifContent, 0.25, {TextTransparency = 0.2})
-        tween(closeBtn, 0.25, {TextTransparency = 0.3})
+        tween(closeBtn, 0.25, {ImageTransparency = 0.4})
         tween(progressFill, duration, {Size = UDim2.new(0, 0, 1, 0)}, Enum.EasingStyle.Linear)
 
         closeBtn.MouseEnter:Connect(function()
-            tween(closeBtn, 0.15, {TextColor3 = Sansik.Theme.TextColor, TextTransparency = 0, BackgroundTransparency = 0.85})
+            tween(closeBtn, 0.15, {ImageColor3 = Sansik.Theme.TextColor, ImageTransparency = 0, BackgroundTransparency = 0.85})
         end)
         closeBtn.MouseLeave:Connect(function()
-            tween(closeBtn, 0.15, {TextColor3 = Sansik.Theme.TextSecondary, TextTransparency = 0.3, BackgroundTransparency = 1})
+            tween(closeBtn, 0.15, {ImageColor3 = Sansik.Theme.TextSecondary, ImageTransparency = 0.4, BackgroundTransparency = 1})
         end)
 
+        local dismissed = false
         local function dismiss()
+            if dismissed then return end
+            dismissed = true
             tween(notif, 0.3, {Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1})
             tween(NotifTitle, 0.2, {TextTransparency = 1})
             tween(NotifContent, 0.2, {TextTransparency = 1})
-            tween(closeBtn, 0.2, {TextTransparency = 1})
+            tween(closeBtn, 0.2, {ImageTransparency = 1})
             tween(iconFrame, 0.2, {BackgroundTransparency = 1})
             tween(iconImg, 0.2, {ImageTransparency = 1})
             task.wait(0.35)
@@ -755,12 +762,24 @@ function Sansik:Window(props)
 
     -- Minimize / Close
     local Minimized = false
+
+    local function setContentVisible(visible)
+        Sidebar.Visible = visible
+        Content.Visible = visible
+        TopbarDivider.Visible = visible
+        BottomLeftFix.Visible = visible
+        BottomRightFix.Visible = visible
+    end
+
     MinimizeBtn.MouseButton1Click:Connect(function()
         Minimized = not Minimized
         if Minimized then
+            setContentVisible(false)
             tween(Main, 0.35, {Size = UDim2.new(0, 600, 0, 56)})
         else
             tween(Main, 0.35, {Size = UDim2.new(0, 600, 0, 400)})
+            task.wait(0.15)
+            setContentVisible(true)
         end
     end)
 
