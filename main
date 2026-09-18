@@ -1,5 +1,5 @@
--- Sansik UI Library v2.0
--- Sidebar layout inspired by Rayfield Gen2
+-- Sansik UI Library v2.1
+-- Sidebar layout, fixed corners
 
 local Sansik = {}
 Sansik.Flags = {}
@@ -23,9 +23,6 @@ Sansik.Theme = {
     ToggleEnabled = Color3.fromRGB(0, 200, 130),
     ToggleDisabled = Color3.fromRGB(60, 60, 70),
     NotificationBackground = Color3.fromRGB(22, 22, 26),
-    InputBackground = Color3.fromRGB(28, 28, 34),
-    InputStroke = Color3.fromRGB(55, 55, 65),
-    PlaceholderColor = Color3.fromRGB(120, 120, 130),
     Accent = Color3.fromRGB(0, 200, 130),
 }
 
@@ -40,21 +37,43 @@ local Services = {
 
 local Player = Services.Players.LocalPlayer
 
--- Иконки Lucide
+-- ============ ИКОНКИ ============
 local Icons = {}
+local iconsLoaded = false
+
 pcall(function()
-    Icons = loadstring(game:HttpGet("https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/refs/heads/main/icons.lua"))()
+    local src = game:HttpGet("https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/refs/heads/main/icons.lua")
+    Icons = loadstring(src)()
+    iconsLoaded = true
 end)
 
+local FallbackIcons = {
+    home = "rbxassetid://10709790398",
+    shield = "rbxassetid://10709794005",
+    crosshair = "rbxassetid://10709788764",
+    smile = "rbxassetid://10709792413",
+    box = "rbxassetid://10709787512",
+    search = "rbxassetid://10709789252",
+    settings = "rbxassetid://10709791120",
+    minus = "rbxassetid://10709789939",
+    x = "rbxassetid://10709794675",
+}
+
 local function getIcon(name)
-    if not Icons or not name then return nil end
-    local icon = Icons['48px'][string.lower(name)]
-    if not icon then return nil end
-    return {
-        id = "rbxassetid://" .. icon[1],
-        rectOffset = Vector2.new(icon[3][1], icon[3][2]),
-        rectSize = Vector2.new(icon[2][1], icon[2][2]),
-    }
+    if iconsLoaded and Icons and Icons['48px'] then
+        local icon = Icons['48px'][string.lower(name)]
+        if icon then
+            return {
+                id = "rbxassetid://" .. icon[1],
+                rectOffset = Vector2.new(icon[3][1], icon[3][2]),
+                rectSize = Vector2.new(icon[2][1], icon[2][2]),
+            }
+        end
+    end
+    if FallbackIcons[name] then
+        return { id = FallbackIcons[name], rectOffset = nil, rectSize = nil }
+    end
+    return nil
 end
 
 local function tween(obj, time, props, style, dir)
@@ -65,7 +84,10 @@ local function tween(obj, time, props, style, dir)
     ):Play()
 end
 
+-- ВАЖНО: corner ПЕРЕД stroke
 local function corner(parent, radius)
+    local existing = parent:FindFirstChildOfClass("UICorner")
+    if existing then existing:Destroy() end
     local c = Instance.new("UICorner")
     c.CornerRadius = UDim.new(0, radius or 6)
     c.Parent = parent
@@ -73,12 +95,21 @@ local function corner(parent, radius)
 end
 
 local function stroke(parent, color, thickness, transparency)
+    local existing = parent:FindFirstChildOfClass("UIStroke")
+    if existing then existing:Destroy() end
     local s = Instance.new("UIStroke")
     s.Color = color or Sansik.Theme.ElementStroke
     s.Thickness = thickness or 1
     s.Transparency = transparency or 0
+    s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     s.Parent = parent
     return s
+end
+
+-- Утилита: сразу corner + stroke
+local function decorate(parent, radius, strokeColor, strokeTransparency)
+    corner(parent, radius)
+    stroke(parent, strokeColor or Sansik.Theme.ElementStroke, 1, strokeTransparency or 0.5)
 end
 
 local function makeDraggable(frame, dragFrame)
@@ -114,7 +145,7 @@ function Sansik:Window(props)
     props = props or {}
 
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "SansikUI"
+    ScreenGui.Name = "SansikUI_" .. tostring(math.random(1000, 9999))
     ScreenGui.ResetOnSpawn = false
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     ScreenGui.IgnoreGuiInset = true
@@ -140,10 +171,9 @@ function Sansik:Window(props)
     Main.Active = true
     Main.ClipsDescendants = true
     Main.Parent = ScreenGui
-    corner(Main, 12)
+    corner(Main, 14)
     stroke(Main, Sansik.Theme.ElementStroke, 1, 0.6)
 
-    -- Тень
     local Shadow = Instance.new("ImageLabel")
     Shadow.Name = "Shadow"
     Shadow.Size = UDim2.new(1, 40, 1, 40)
@@ -165,8 +195,18 @@ function Sansik:Window(props)
     Topbar.BorderSizePixel = 0
     Topbar.Active = true
     Topbar.Parent = Main
+    corner(Topbar, 14)
 
-    -- Заголовок
+    -- Фикс нижних углов topbar
+    local TopbarBottomFix = Instance.new("Frame")
+    TopbarBottomFix.Name = "BottomFix"
+    TopbarBottomFix.Size = UDim2.new(1, 0, 0, 14)
+    TopbarBottomFix.Position = UDim2.new(0, 0, 1, -14)
+    TopbarBottomFix.BackgroundColor3 = Sansik.Theme.Topbar
+    TopbarBottomFix.BorderSizePixel = 0
+    TopbarBottomFix.ZIndex = 0
+    TopbarBottomFix.Parent = Topbar
+
     local Title = Instance.new("TextLabel")
     Title.Name = "Title"
     Title.Text = props.title or "Sansik Hub"
@@ -177,12 +217,12 @@ function Sansik:Window(props)
     Title.TextXAlignment = Enum.TextXAlignment.Left
     Title.Position = UDim2.new(0, 20, 0, 10)
     Title.Size = UDim2.new(0.5, 0, 0, 20)
+    Title.ZIndex = 2
     Title.Parent = Topbar
 
-    -- Подпись
     local Subtitle = Instance.new("TextLabel")
     Subtitle.Name = "Subtitle"
-    Subtitle.Text = props.subtitle or "Universal | Real 97% UNC"
+    Subtitle.Text = props.subtitle or ""
     Subtitle.Font = Enum.Font.Gotham
     Subtitle.TextSize = 11
     Subtitle.TextColor3 = Sansik.Theme.TextSecondary
@@ -190,25 +230,26 @@ function Sansik:Window(props)
     Subtitle.TextXAlignment = Enum.TextXAlignment.Left
     Subtitle.Position = UDim2.new(0, 20, 0, 32)
     Subtitle.Size = UDim2.new(0.5, 0, 0, 14)
+    Subtitle.ZIndex = 2
     Subtitle.Parent = Topbar
 
-    -- Кнопки действий
     local function topbarButton(name, xOffset, iconName)
         local btn = Instance.new("ImageButton")
         btn.Name = name
-        btn.Size = UDim2.new(0, 26, 0, 26)
-        btn.Position = UDim2.new(1, xOffset, 0.5, -13)
+        btn.Size = UDim2.new(0, 30, 0, 30)
+        btn.Position = UDim2.new(1, xOffset, 0.5, -15)
         btn.BackgroundTransparency = 1
         btn.Image = ""
+        btn.ZIndex = 2
         btn.Parent = Topbar
-        corner(btn, 6)
+        corner(btn, 8)
 
-        if iconName and Icons then
+        if iconName then
             local ico = getIcon(iconName)
             if ico then
                 btn.Image = ico.id
-                btn.ImageRectOffset = ico.rectOffset
-                btn.ImageRectSize = ico.rectSize
+                if ico.rectOffset then btn.ImageRectOffset = ico.rectOffset end
+                if ico.rectSize then btn.ImageRectSize = ico.rectSize end
                 btn.ImageColor3 = Sansik.Theme.TextSecondary
             end
         end
@@ -223,18 +264,19 @@ function Sansik:Window(props)
         return btn
     end
 
-    local SearchBtn = topbarButton("Search", -140, "search")
-    local SettingsBtn = topbarButton("Settings", -110, "settings")
-    local MinimizeBtn = topbarButton("Minimize", -80, "minus")
-    local CloseBtn = topbarButton("Close", -50, "x")
+    local SearchBtn = topbarButton("Search", -150, "search")
+    local SettingsBtn = topbarButton("Settings", -118, "settings")
+    local MinimizeBtn = topbarButton("Minimize", -86, "minus")
+    local CloseBtn = topbarButton("Close", -54, "x")
 
-    -- Разделитель под топбаром
     local TopbarDivider = Instance.new("Frame")
+    TopbarDivider.Name = "Divider"
     TopbarDivider.Size = UDim2.new(1, 0, 0, 1)
     TopbarDivider.Position = UDim2.new(0, 0, 1, -1)
     TopbarDivider.BackgroundColor3 = Sansik.Theme.ElementStroke
     TopbarDivider.BorderSizePixel = 0
     TopbarDivider.BackgroundTransparency = 0.5
+    TopbarDivider.ZIndex = 3
     TopbarDivider.Parent = Topbar
 
     -- ============ SIDEBAR ============
@@ -246,8 +288,18 @@ function Sansik:Window(props)
     Sidebar.BorderSizePixel = 0
     Sidebar.Parent = Main
 
-    -- Разделитель сайдбара
+    -- Фикс верхнего левого угла sidebar (чтобы не торчал под topbar)
+    local SidebarCornerFix = Instance.new("Frame")
+    SidebarCornerFix.Name = "CornerFix"
+    SidebarCornerFix.Size = UDim2.new(0, 14, 0, 14)
+    SidebarCornerFix.Position = UDim2.new(0, 0, 0, 0)
+    SidebarCornerFix.BackgroundColor3 = Sansik.Theme.Topbar
+    SidebarCornerFix.BorderSizePixel = 0
+    SidebarCornerFix.ZIndex = 1
+    SidebarCornerFix.Parent = Sidebar
+
     local SidebarDivider = Instance.new("Frame")
+    SidebarDivider.Name = "Divider"
     SidebarDivider.Size = UDim2.new(0, 1, 1, 0)
     SidebarDivider.Position = UDim2.new(1, -1, 0, 0)
     SidebarDivider.BackgroundColor3 = Sansik.Theme.ElementStroke
@@ -255,7 +307,6 @@ function Sansik:Window(props)
     SidebarDivider.BackgroundTransparency = 0.5
     SidebarDivider.Parent = Sidebar
 
-    -- Список вкладок
     local TabList = Instance.new("Frame")
     TabList.Name = "TabList"
     TabList.Size = UDim2.new(1, -16, 1, -80)
@@ -268,7 +319,7 @@ function Sansik:Window(props)
     TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
     TabListLayout.Parent = TabList
 
-    -- Профиль игрока (внизу сайдбара)
+    -- ============ ПРОФИЛЬ ============
     local Profile = Instance.new("Frame")
     Profile.Name = "Profile"
     Profile.Size = UDim2.new(1, -16, 0, 56)
@@ -276,7 +327,7 @@ function Sansik:Window(props)
     Profile.BackgroundColor3 = Sansik.Theme.TabBackground
     Profile.BorderSizePixel = 0
     Profile.Parent = Sidebar
-    corner(Profile, 8)
+    corner(Profile, 10)
 
     local Avatar = Instance.new("ImageLabel")
     Avatar.Name = "Avatar"
@@ -284,11 +335,9 @@ function Sansik:Window(props)
     Avatar.Position = UDim2.new(0, 10, 0.5, -18)
     Avatar.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
     Avatar.BorderSizePixel = 0
-    Avatar.Image = ""
     Avatar.Parent = Profile
     corner(Avatar, 18)
 
-    -- Загружаем аватар
     task.spawn(function()
         local ok, thumb = pcall(function()
             return Services.Players:GetUserThumbnailAsync(
@@ -318,7 +367,7 @@ function Sansik:Window(props)
     -- ============ CONTENT ============
     local Content = Instance.new("ScrollingFrame")
     Content.Name = "Content"
-    Content.Size = UDim2.new(1, -196, 1, -72)
+    Content.Size = UDim2.new(1, -200, 1, -72)
     Content.Position = UDim2.new(0, 188, 0, 64)
     Content.BackgroundTransparency = 1
     Content.BorderSizePixel = 0
@@ -356,10 +405,10 @@ function Sansik:Window(props)
         notif.BackgroundColor3 = Sansik.Theme.NotificationBackground
         notif.BorderSizePixel = 0
         notif.Parent = NotifFrame
-        corner(notif, 8)
-        stroke(notif, Sansik.Theme.ElementStroke, 1, 0.5)
         notif.BackgroundTransparency = 1
         notif.ClipsDescendants = true
+        corner(notif, 10)
+        stroke(notif, Sansik.Theme.ElementStroke, 1, 0.5)
 
         local NotifTitle = Instance.new("TextLabel")
         NotifTitle.Text = props.title or "Notification"
@@ -405,7 +454,6 @@ function Sansik:Window(props)
         local name = props.name or "Tab"
         local iconName = props.icon or nil
 
-        -- Кнопка вкладки в сайдбаре
         local TabBtn = Instance.new("TextButton")
         TabBtn.Name = name
         TabBtn.Size = UDim2.new(1, 0, 0, 34)
@@ -413,10 +461,10 @@ function Sansik:Window(props)
         TabBtn.BorderSizePixel = 0
         TabBtn.Text = ""
         TabBtn.BackgroundTransparency = 1
+        TabBtn.AutoButtonColor = false
         TabBtn.Parent = TabList
         corner(TabBtn, 8)
 
-        -- Иконка
         local TabIcon = Instance.new("ImageLabel")
         TabIcon.Name = "Icon"
         TabIcon.Size = UDim2.new(0, 18, 0, 18)
@@ -425,16 +473,15 @@ function Sansik:Window(props)
         TabIcon.ImageColor3 = Sansik.Theme.TabTextColor
         TabIcon.Parent = TabBtn
 
-        if iconName and Icons then
+        if iconName then
             local ico = getIcon(iconName)
             if ico then
                 TabIcon.Image = ico.id
-                TabIcon.ImageRectOffset = ico.rectOffset
-                TabIcon.ImageRectSize = ico.rectSize
+                if ico.rectOffset then TabIcon.ImageRectOffset = ico.rectOffset end
+                if ico.rectSize then TabIcon.ImageRectSize = ico.rectSize end
             end
         end
 
-        -- Текст
         local BtnLabel = Instance.new("TextLabel")
         BtnLabel.Text = name
         BtnLabel.Font = Enum.Font.GothamMedium
@@ -446,7 +493,6 @@ function Sansik:Window(props)
         BtnLabel.Size = UDim2.new(1, -48, 1, 0)
         BtnLabel.Parent = TabBtn
 
-        -- Страница контента
         local Page = Instance.new("Frame")
         Page.Name = name .. "Page"
         Page.Size = UDim2.new(1, 0, 0, 0)
@@ -460,7 +506,6 @@ function Sansik:Window(props)
         PageLayout.SortOrder = Enum.SortOrder.LayoutOrder
         PageLayout.Parent = Page
 
-        -- Логика выбора
         local function select()
             if currentTab == Page then return end
 
@@ -510,7 +555,6 @@ function Sansik:Window(props)
             return elementOrder
         end
 
-        -- Здесь пока оставляем старые элементы, во второй части переделаем
         local function baseElement(height)
             local frame = Instance.new("Frame")
             frame.Size = UDim2.new(1, 0, 0, height)
@@ -518,11 +562,12 @@ function Sansik:Window(props)
             frame.BorderSizePixel = 0
             frame.LayoutOrder = nextOrder()
             frame.Parent = Page
-            corner(frame, 8)
+            corner(frame, 10)
             stroke(frame, Sansik.Theme.ElementStroke, 1, 0.5)
             return frame
         end
 
+        -- ============ BUTTON ============
         function Tab:Button(props)
             local btn = baseElement(44)
             btn.Name = props.name or "Button"
@@ -549,7 +594,9 @@ function Sansik:Window(props)
             clickable.Size = UDim2.new(1, 0, 1, 0)
             clickable.BackgroundTransparency = 1
             clickable.Text = ""
+            clickable.AutoButtonColor = false
             clickable.Parent = btn
+            corner(clickable, 10)
 
             clickable.MouseButton1Click:Connect(function()
                 if props.callback then pcall(props.callback) end
@@ -560,6 +607,7 @@ function Sansik:Window(props)
             }
         end
 
+        -- ============ SECTION ============
         function Tab:Section(props)
             local section = Instance.new("Frame")
             section.Name = "Section"
