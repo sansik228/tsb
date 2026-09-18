@@ -1,4 +1,4 @@
--- Sansik UI Library v3.2
+-- Sansik UI Library v3.25
 -- Matched to Gen2 reference
 
 local Sansik = {}
@@ -327,13 +327,12 @@ function Sansik:Window(props)
     -- ============ ПРОФИЛЬ ============
     local Profile = Instance.new("Frame")
     Profile.Name = "Profile"
-    Profile.Size = UDim2.new(1, -16, 0, 56)
-    Profile.Position = UDim2.new(0, 8, 1, -64)
-    Profile.BackgroundColor3 = Sansik.Theme.TabBackground
+    Profile.Size = UDim2.new(1, 0, 0, 56)
+    Profile.Position = UDim2.new(0, 0, 1, -56)
+    Profile.BackgroundColor3 = Sansik.Theme.Sidebar
     Profile.BorderSizePixel = 0
     Profile.ZIndex = 2
     Profile.Parent = Sidebar
-    corner(Profile, 10)
 
     local Avatar = Instance.new("ImageLabel")
     Avatar.Name = "Avatar"
