@@ -1,5 +1,5 @@
--- Sansik UI Library v3.5
--- Toggle with outline style (no background fill)
+-- Sansik UI Library v3.6
+-- Added Dropdown (Gen2 style)
 
 local Sansik = {}
 Sansik.Flags = {}
@@ -24,6 +24,9 @@ Sansik.Theme = {
     ToggleEnabledStroke = Color3.fromRGB(0, 220, 150),
     ToggleDisabled = Color3.fromRGB(60, 60, 70),
     ToggleDisabledStroke = Color3.fromRGB(80, 80, 90),
+    DropdownBackground = Color3.fromRGB(22, 22, 26),
+    DropdownOption = Color3.fromRGB(28, 28, 34),
+    DropdownOptionHover = Color3.fromRGB(38, 38, 46),
     NotificationBackground = Color3.fromRGB(22, 22, 26),
     Accent = Color3.fromRGB(0, 200, 130),
 }
@@ -62,6 +65,9 @@ local FallbackIcons = {
     check = "rbxassetid://10709788428",
     info = "rbxassetid://10709790910",
     ["alert-triangle"] = "rbxassetid://10709787142",
+    ["chevron-down"] = "rbxassetid://10709788988",
+    ["chevron-up"] = "rbxassetid://10709789084",
+    square = "rbxassetid://10709793324",
 }
 
 local function getIcon(name)
@@ -744,7 +750,7 @@ function Sansik:Window(props)
             }
         end
 
-        -- ============ TOGGLE (outline style) ============
+        -- ============ TOGGLE ============
         function Tab:Toggle(props)
             local toggle = baseElement(46)
             toggle.Name = props.name or "Toggle"
@@ -771,7 +777,6 @@ function Sansik:Window(props)
             desc.Size = UDim2.new(1, -80, 0, 14)
             desc.Parent = toggle
 
-            -- Switch: прозрачный фон, только stroke
             local switchBg = Instance.new("Frame")
             switchBg.Name = "SwitchBg"
             switchBg.Size = UDim2.new(0, 48, 0, 26)
@@ -951,6 +956,255 @@ function Sansik:Window(props)
                 value = currentValue,
                 Set = function(self, v, silent)
                     setValue(v, true, silent)
+                end
+            }
+
+            if props.flag then Sansik.Flags[props.flag] = currentValue end
+
+            return obj
+        end
+
+        -- ============ DROPDOWN (Gen2 style) ============
+        function Tab:Dropdown(props)
+            local dropdown = baseElement(46)
+            dropdown.Name = props.name or "Dropdown"
+            dropdown.ClipsDescendants = false
+
+            -- Заголовок
+            local label = Instance.new("TextLabel")
+            label.Text = props.name or "Dropdown"
+            label.Font = Enum.Font.GothamMedium
+            label.TextSize = 13
+            label.TextColor3 = Sansik.Theme.TextColor
+            label.BackgroundTransparency = 1
+            label.TextXAlignment = Enum.TextXAlignment.Left
+            label.Position = UDim2.new(0, 14, 0, 0)
+            label.Size = UDim2.new(0.5, 0, 1, 0)
+            label.Parent = dropdown
+
+            -- Выбранное значение справа
+            local selectedLabel = Instance.new("TextLabel")
+            selectedLabel.Text = props.value or "None"
+            selectedLabel.Font = Enum.Font.Gotham
+            selectedLabel.TextSize = 12
+            selectedLabel.TextColor3 = Sansik.Theme.TextSecondary
+            selectedLabel.BackgroundTransparency = 1
+            selectedLabel.TextXAlignment = Enum.TextXAlignment.Right
+            selectedLabel.Position = UDim2.new(0.5, 0, 0, 0)
+            selectedLabel.Size = UDim2.new(0.5, -40, 1, 0)
+            selectedLabel.Parent = dropdown
+
+            -- Стрелка
+            local arrow = Instance.new("ImageLabel")
+            arrow.Name = "Arrow"
+            arrow.Size = UDim2.new(0, 14, 0, 14)
+            arrow.Position = UDim2.new(1, -24, 0.5, -7)
+            arrow.BackgroundTransparency = 1
+            arrow.ImageColor3 = Sansik.Theme.TextSecondary
+            arrow.Parent = dropdown
+
+            local arrowIco = getIcon("chevron-down")
+            if arrowIco then
+                arrow.Image = arrowIco.id
+                if arrowIco.rectOffset then arrow.ImageRectOffset = arrowIco.rectOffset end
+                if arrowIco.rectSize then arrow.ImageRectSize = arrowIco.rectSize end
+            end
+
+            -- Кнопка-кликалка
+            local clickable = Instance.new("TextButton")
+            clickable.Size = UDim2.new(1, 0, 1, 0)
+            clickable.BackgroundTransparency = 1
+            clickable.Text = ""
+            clickable.AutoButtonColor = false
+            clickable.Parent = dropdown
+            corner(clickable, 10)
+
+            clickable.MouseEnter:Connect(function()
+                tween(dropdown, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackgroundHover})
+            end)
+            clickable.MouseLeave:Connect(function()
+                if not dropdown:GetAttribute("Open") then
+                    tween(dropdown, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackground})
+                end
+            end)
+
+            -- Список опций (скрытый по умолчанию)
+            local list = Instance.new("Frame")
+            list.Name = "List"
+            list.Size = UDim2.new(1, 0, 0, 0)
+            list.Position = UDim2.new(0, 0, 1, 4)
+            list.BackgroundColor3 = Sansik.Theme.DropdownBackground
+            list.BorderSizePixel = 0
+            list.Visible = false
+            list.ClipsDescendants = true
+            list.ZIndex = 10
+            list.Parent = dropdown
+            corner(list, 10)
+            stroke(list, Sansik.Theme.ElementStroke, 1, 0.5)
+
+            local searchBox = Instance.new("TextBox")
+            searchBox.Name = "Search"
+            searchBox.Size = UDim2.new(1, -16, 0, 32)
+            searchBox.Position = UDim2.new(0, 8, 0, 8)
+            searchBox.BackgroundColor3 = Sansik.Theme.DropdownOption
+            searchBox.BorderSizePixel = 0
+            searchBox.Text = ""
+            searchBox.PlaceholderText = "Search..."
+            searchBox.Font = Enum.Font.Gotham
+            searchBox.TextSize = 12
+            searchBox.TextColor3 = Sansik.Theme.TextColor
+            searchBox.PlaceholderColor3 = Sansik.Theme.TextSecondary
+            searchBox.TextXAlignment = Enum.TextXAlignment.Left
+            searchBox.ClearTextOnFocus = false
+            searchBox.ZIndex = 11
+            searchBox.Parent = list
+            corner(searchBox, 6)
+            local searchPadding = Instance.new("UIPadding")
+            searchPadding.PaddingLeft = UDim.new(0, 10)
+            searchPadding.Parent = searchBox
+
+            -- Скролл для опций
+            local optionsScroll = Instance.new("ScrollingFrame")
+            optionsScroll.Name = "Options"
+            optionsScroll.Size = UDim2.new(1, -16, 1, -48)
+            optionsScroll.Position = UDim2.new(0, 8, 0, 48)
+            optionsScroll.BackgroundTransparency = 1
+            optionsScroll.BorderSizePixel = 0
+            optionsScroll.ScrollBarThickness = 3
+            optionsScroll.ScrollBarImageColor3 = Sansik.Theme.ElementStroke
+            optionsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+            optionsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+            optionsScroll.ZIndex = 11
+            optionsScroll.Parent = list
+
+            local optionsLayout = Instance.new("UIListLayout")
+            optionsLayout.Padding = UDim.new(0, 4)
+            optionsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            optionsLayout.Parent = optionsScroll
+
+            local currentValue = props.value or nil
+            local optionButtons = {}
+
+            local function updateSelected()
+                selectedLabel.Text = currentValue or "None"
+            end
+            updateSelected()
+
+            local function createOption(optionName)
+                local optionBtn = Instance.new("TextButton")
+                optionBtn.Name = optionName
+                optionBtn.Size = UDim2.new(1, 0, 0, 34)
+                optionBtn.BackgroundColor3 = Sansik.Theme.DropdownOption
+                optionBtn.BorderSizePixel = 0
+                optionBtn.Text = ""
+                optionBtn.AutoButtonColor = false
+                optionBtn.ZIndex = 11
+                optionBtn.Parent = optionsScroll
+                corner(optionBtn, 6)
+
+                -- Иконка-квадратик слева
+                local optIcon = Instance.new("ImageLabel")
+                optIcon.Size = UDim2.new(0, 14, 0, 14)
+                optIcon.Position = UDim2.new(0, 12, 0.5, -7)
+                optIcon.BackgroundTransparency = 1
+                optIcon.ImageColor3 = Sansik.Theme.TextSecondary
+                optIcon.ZIndex = 12
+                optIcon.Parent = optionBtn
+
+                local sqIco = getIcon("square")
+                if sqIco then
+                    optIcon.Image = sqIco.id
+                    if sqIco.rectOffset then optIcon.ImageRectOffset = sqIco.rectOffset end
+                    if sqIco.rectSize then optIcon.ImageRectSize = sqIco.rectSize end
+                end
+
+                local optLabel = Instance.new("TextLabel")
+                optLabel.Text = optionName
+                optLabel.Font = Enum.Font.Gotham
+                optLabel.TextSize = 12
+                optLabel.TextColor3 = Sansik.Theme.TextColor
+                optLabel.BackgroundTransparency = 1
+                optLabel.TextXAlignment = Enum.TextXAlignment.Left
+                optLabel.Position = UDim2.new(0, 36, 0, 0)
+                optLabel.Size = UDim2.new(1, -48, 1, 0)
+                optLabel.ZIndex = 12
+                optLabel.Parent = optionBtn
+
+                optionBtn.MouseEnter:Connect(function()
+                    tween(optionBtn, 0.12, {BackgroundColor3 = Sansik.Theme.DropdownOptionHover})
+                end)
+                optionBtn.MouseLeave:Connect(function()
+                    tween(optionBtn, 0.12, {BackgroundColor3 = Sansik.Theme.DropdownOption})
+                end)
+
+                optionBtn.MouseButton1Click:Connect(function()
+                    currentValue = optionName
+                    updateSelected()
+                    if props.flag then Sansik.Flags[props.flag] = currentValue end
+                    if props.callback then pcall(props.callback, currentValue) end
+                    -- закрыть dropdown
+                    dropdown:SetAttribute("Open", false)
+                    arrow.Rotation = 0
+                    tween(list, 0.2, {Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1})
+                    task.wait(0.2)
+                    list.Visible = false
+                    tween(dropdown, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackground})
+                end)
+
+                return optionBtn
+            end
+
+            for _, optionName in ipairs(props.options or {}) do
+                table.insert(optionButtons, createOption(optionName))
+            end
+
+            -- Поиск
+            searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+                local query = string.lower(searchBox.Text)
+                for _, optBtn in ipairs(optionButtons) do
+                    if string.find(string.lower(optBtn.Name), query, 1, true) then
+                        optBtn.Visible = true
+                    else
+                        optBtn.Visible = false
+                    end
+                end
+            end)
+
+            -- Открытие/закрытие
+            clickable.MouseButton1Click:Connect(function()
+                local isOpen = dropdown:GetAttribute("Open") or false
+                if isOpen then
+                    dropdown:SetAttribute("Open", false)
+                    arrow.Rotation = 0
+                    tween(list, 0.25, {Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1})
+                    task.wait(0.25)
+                    list.Visible = false
+                    tween(dropdown, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackground})
+                else
+                    dropdown:SetAttribute("Open", true)
+                    arrow.Rotation = 180
+                    list.Visible = true
+                    list.BackgroundTransparency = 1
+                    tween(list, 0.25, {Size = UDim2.new(1, 0, 0, 200), BackgroundTransparency = 0})
+                end
+            end)
+
+            local obj = {
+                value = currentValue,
+                Set = function(self, v, silent)
+                    currentValue = v
+                    updateSelected()
+                    if props.flag then Sansik.Flags[props.flag] = currentValue end
+                    if not silent and props.callback then pcall(props.callback, currentValue) end
+                end,
+                Refresh = function(self, newOptions)
+                    for _, optBtn in ipairs(optionButtons) do
+                        optBtn:Destroy()
+                    end
+                    optionButtons = {}
+                    for _, optionName in ipairs(newOptions) do
+                        table.insert(optionButtons, createOption(optionName))
+                    end
                 end
             }
 
