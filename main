@@ -750,4 +750,262 @@ function Sansik:Window(props)
             local desc = Instance.new("TextLabel")
             desc.Text = props.description or ""
             desc.Font = Enum.Font.Gotham
-            desc.Text
+            desc.TextSize = 11
+            desc.TextColor3 = Sansik.Theme.TextSecondary
+            desc.BackgroundTransparency = 1
+            desc.TextXAlignment = Enum.TextXAlignment.Left
+            desc.Position = UDim2.new(0, 14, 0, 26)
+            desc.Size = UDim2.new(1, -80, 0, 16)
+            desc.Parent = toggle
+
+            -- Switch (как на скрине: pill + круглый белый индикатор)
+            local switchBg = Instance.new("Frame")
+            switchBg.Name = "SwitchBg"
+            switchBg.Size = UDim2.new(0, 44, 0, 24)
+            switchBg.Position = UDim2.new(1, -58, 0.5, -12)
+            switchBg.BackgroundColor3 = Sansik.Theme.ToggleDisabled
+            switchBg.BorderSizePixel = 0
+            switchBg.Parent = toggle
+            corner(switchBg, 12)
+
+            local indicator = Instance.new("Frame")
+            indicator.Name = "Indicator"
+            indicator.Size = UDim2.new(0, 18, 0, 18)
+            indicator.Position = UDim2.new(0, 3, 0.5, -9)
+            indicator.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            indicator.BorderSizePixel = 0
+            indicator.Parent = switchBg
+            corner(indicator, 9)
+
+            local state = props.value or false
+
+            local function updateSwitch(animated)
+                if state then
+                    tween(switchBg, animated and 0.2 or 0, {BackgroundColor3 = Sansik.Theme.ToggleEnabled})
+                    tween(indicator, animated and 0.2 or 0, {Position = UDim2.new(1, -21, 0.5, -9)})
+                else
+                    tween(switchBg, animated and 0.2 or 0, {BackgroundColor3 = Sansik.Theme.ToggleDisabled})
+                    tween(indicator, animated and 0.2 or 0, {Position = UDim2.new(0, 3, 0.5, -9)})
+                end
+            end
+            updateSwitch(false)
+
+            local clickable = Instance.new("TextButton")
+            clickable.Size = UDim2.new(1, 0, 1, 0)
+            clickable.BackgroundTransparency = 1
+            clickable.Text = ""
+            clickable.AutoButtonColor = false
+            clickable.Parent = toggle
+            corner(clickable, 10)
+
+            clickable.MouseEnter:Connect(function()
+                tween(toggle, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackgroundHover})
+            end)
+            clickable.MouseLeave:Connect(function()
+                tween(toggle, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackground})
+            end)
+
+            clickable.MouseButton1Click:Connect(function()
+                state = not state
+                updateSwitch(true)
+                if props.flag then Sansik.Flags[props.flag] = state end
+                if props.callback then pcall(props.callback, state) end
+            end)
+
+            local obj = {
+                value = state,
+                Set = function(self, v, silent)
+                    state = v
+                    updateSwitch(true)
+                    if props.flag then Sansik.Flags[props.flag] = state end
+                    if not silent and props.callback then pcall(props.callback, state) end
+                end
+            }
+
+            if props.flag then Sansik.Flags[props.flag] = state end
+
+            return obj
+        end
+
+        -- ============ SLIDER ============
+        function Tab:Slider(props)
+            local slider = baseElement(72)
+            slider.Name = props.name or "Slider"
+
+            local label = Instance.new("TextLabel")
+            label.Text = props.name or "Slider"
+            label.Font = Enum.Font.GothamMedium
+            label.TextSize = 13
+            label.TextColor3 = Sansik.Theme.TextColor
+            label.BackgroundTransparency = 1
+            label.TextXAlignment = Enum.TextXAlignment.Left
+            label.Position = UDim2.new(0, 14, 0, 8)
+            label.Size = UDim2.new(0.5, 0, 0, 18)
+            label.Parent = slider
+
+            -- Значение слева внизу (как на скрине: "16" под названием)
+            local valueLabel = Instance.new("TextLabel")
+            valueLabel.Text = tostring(props.value or props.range[1])
+            valueLabel.Font = Enum.Font.Gotham
+            valueLabel.TextSize = 12
+            valueLabel.TextColor3 = Sansik.Theme.TextSecondary
+            valueLabel.BackgroundTransparency = 1
+            valueLabel.TextXAlignment = Enum.TextXAlignment.Left
+            valueLabel.Position = UDim2.new(0, 14, 0, 28)
+            valueLabel.Size = UDim2.new(0.5, 0, 0, 16)
+            valueLabel.Parent = slider
+
+            -- Трек справа
+            local track = Instance.new("Frame")
+            track.Name = "Track"
+            track.Size = UDim2.new(0, 240, 0, 8)
+            track.Position = UDim2.new(1, -254, 0.5, -4)
+            track.BackgroundColor3 = Sansik.Theme.SliderBackground
+            track.BorderSizePixel = 0
+            track.Parent = slider
+            corner(track, 4)
+
+            local fill = Instance.new("Frame")
+            fill.Name = "Fill"
+            fill.Size = UDim2.new(0, 0, 1, 0)
+            fill.BackgroundColor3 = Sansik.Theme.SliderProgress
+            fill.BorderSizePixel = 0
+            fill.Parent = track
+            corner(fill, 4)
+
+            -- Круглый индикатор (белый, как на скрине)
+            local knob = Instance.new("Frame")
+            knob.Name = "Knob"
+            knob.Size = UDim2.new(0, 20, 0, 20)
+            knob.Position = UDim2.new(0, 0, 0.5, -10)
+            knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            knob.BorderSizePixel = 0
+            knob.ZIndex = 2
+            knob.Parent = track
+            corner(knob, 10)
+
+            local min = props.range[1]
+            local max = props.range[2]
+            local increment = props.increment or 1
+            local currentValue = props.value or min
+
+            local function setValue(v, animated, silent)
+                currentValue = math.clamp(v, min, max)
+                local percent = (currentValue - min) / (max - min)
+                tween(fill, animated and 0.1 or 0, {Size = UDim2.new(percent, 0, 1, 0)})
+                tween(knob, animated and 0.1 or 0, {Position = UDim2.new(percent, -10, 0.5, -10)})
+                valueLabel.Text = tostring(currentValue) .. (props.suffix and (" " .. props.suffix) or "")
+                if props.flag then Sansik.Flags[props.flag] = currentValue end
+                if not silent and props.callback then pcall(props.callback, currentValue) end
+            end
+            setValue(currentValue, false, true)
+
+            local dragging = false
+            local trackBtn = Instance.new("TextButton")
+            trackBtn.Size = UDim2.new(1, 0, 1, 0)
+            trackBtn.BackgroundTransparency = 1
+            trackBtn.Text = ""
+            trackBtn.AutoButtonColor = false
+            trackBtn.Parent = track
+            corner(trackBtn, 4)
+
+            local function updateFromInput(input)
+                local relativeX = input.Position.X - track.AbsolutePosition.X
+                local percent = math.clamp(relativeX / track.AbsoluteSize.X, 0, 1)
+                local raw = min + percent * (max - min)
+                raw = math.floor(raw / increment + 0.5) * increment
+                setValue(raw, true, false)
+            end
+
+            trackBtn.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    dragging = true
+                    updateFromInput(input)
+                end
+            end)
+
+            Services.UserInputService.InputChanged:Connect(function(input)
+                if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                    updateFromInput(input)
+                end
+            end)
+
+            Services.UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    dragging = false
+                end
+            end)
+
+            local obj = {
+                value = currentValue,
+                Set = function(self, v, silent)
+                    setValue(v, true, silent)
+                end
+            }
+
+            if props.flag then Sansik.Flags[props.flag] = currentValue end
+
+            return obj
+        end
+
+        -- ============ SECTION ============
+        function Tab:Section(props)
+            local section = Instance.new("Frame")
+            section.Name = "Section"
+            section.Size = UDim2.new(1, 0, 0, 24)
+            section.BackgroundTransparency = 1
+            section.LayoutOrder = nextOrder()
+            section.Parent = Page
+
+            local label = Instance.new("TextLabel")
+            label.Text = props.name or "Section"
+            label.Font = Enum.Font.GothamBold
+            label.TextSize = 11
+            label.TextColor3 = Sansik.Theme.TextSecondary
+            label.BackgroundTransparency = 1
+            label.TextXAlignment = Enum.TextXAlignment.Left
+            label.Position = UDim2.new(0, 4, 0, 0)
+            label.Size = UDim2.new(1, 0, 1, 0)
+            label.Parent = section
+
+            return {
+                Set = function(self, newName) label.Text = newName end
+            }
+        end
+
+        return Tab
+    end
+
+    -- Minimize / Close
+    local Minimized = false
+
+    local function setContentVisible(visible)
+        Sidebar.Visible = visible
+        Content.Visible = visible
+        TopbarDivider.Visible = visible
+        BottomLeftFix.Visible = visible
+        BottomRightFix.Visible = visible
+    end
+
+    MinimizeBtn.MouseButton1Click:Connect(function()
+        Minimized = not Minimized
+        if Minimized then
+            setContentVisible(false)
+            tween(Main, 0.35, {Size = UDim2.new(0, 600, 0, 56)})
+        else
+            tween(Main, 0.35, {Size = UDim2.new(0, 600, 0, 400)})
+            task.wait(0.15)
+            setContentVisible(true)
+        end
+    end)
+
+    CloseBtn.MouseButton1Click:Connect(function()
+        tween(Main, 0.25, {Size = UDim2.new(0, 600, 0, 0), BackgroundTransparency = 1})
+        task.wait(0.3)
+        ScreenGui:Destroy()
+    end)
+
+    return Window
+end
+
+return Sansik
