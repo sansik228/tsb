@@ -1,5 +1,5 @@
--- Sansik UI Library v3.25
--- Matched to Gen2 reference
+-- Sansik UI Library v3.3
+-- Profile aligned to bottom of sidebar
 
 local Sansik = {}
 Sansik.Flags = {}
@@ -314,7 +314,7 @@ function Sansik:Window(props)
 
     local TabList = Instance.new("Frame")
     TabList.Name = "TabList"
-    TabList.Size = UDim2.new(1, -16, 1, -80)
+    TabList.Size = UDim2.new(1, -16, 1, -136)
     TabList.Position = UDim2.new(0, 8, 0, 8)
     TabList.BackgroundTransparency = 1
     TabList.Parent = Sidebar
@@ -324,7 +324,7 @@ function Sansik:Window(props)
     TabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
     TabListLayout.Parent = TabList
 
-    -- ============ ПРОФИЛЬ ============
+    -- ============ ПРОФИЛЬ (прижат к низу сайдбара) ============
     local Profile = Instance.new("Frame")
     Profile.Name = "Profile"
     Profile.Size = UDim2.new(1, 0, 0, 56)
@@ -333,15 +333,27 @@ function Sansik:Window(props)
     Profile.BorderSizePixel = 0
     Profile.ZIndex = 2
     Profile.Parent = Sidebar
+    corner(Profile, 10)
+    
+    -- Фикс верхних углов profile (чтобы не перекрывал sidebar)
+    local ProfileTopFix = Instance.new("Frame")
+    ProfileTopFix.Name = "TopFix"
+    ProfileTopFix.Size = UDim2.new(1, 0, 0, 10)
+    ProfileTopFix.Position = UDim2.new(0, 0, 0, 0)
+    ProfileTopFix.BackgroundColor3 = Sansik.Theme.Sidebar
+    ProfileTopFix.BorderSizePixel = 0
+    ProfileTopFix.ZIndex = 3
+    ProfileTopFix.Parent = Profile
 
     local Avatar = Instance.new("ImageLabel")
     Avatar.Name = "Avatar"
-    Avatar.Size = UDim2.new(0, 36, 0, 36)
-    Avatar.Position = UDim2.new(0, 10, 0.5, -18)
+    Avatar.Size = UDim2.new(0, 32, 0, 32)
+    Avatar.Position = UDim2.new(0, 14, 0.5, -16)
     Avatar.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
     Avatar.BorderSizePixel = 0
+    Avatar.ZIndex = 4
     Avatar.Parent = Profile
-    corner(Avatar, 18)
+    corner(Avatar, 16)
 
     task.spawn(function()
         local ok, thumb = pcall(function()
@@ -360,13 +372,14 @@ function Sansik:Window(props)
     PlayerName.Name = "PlayerName"
     PlayerName.Text = Player.DisplayName or Player.Name
     PlayerName.Font = Enum.Font.GothamMedium
-    PlayerName.TextSize = 12
+    PlayerName.TextSize = 13
     PlayerName.TextColor3 = Sansik.Theme.TextColor
     PlayerName.BackgroundTransparency = 1
     PlayerName.TextXAlignment = Enum.TextXAlignment.Left
     PlayerName.TextTruncate = Enum.TextTruncate.AtEnd
-    PlayerName.Position = UDim2.new(0, 54, 0.5, -8)
-    PlayerName.Size = UDim2.new(1, -64, 0, 16)
+    PlayerName.Position = UDim2.new(0, 56, 0.5, -8)
+    PlayerName.Size = UDim2.new(1, -66, 0, 16)
+    PlayerName.ZIndex = 4
     PlayerName.Parent = Profile
 
     -- ============ CONTENT ============
@@ -704,7 +717,9 @@ function Sansik:Window(props)
             label.TextXAlignment = Enum.TextXAlignment.Left
             label.Position = UDim2.new(0, 14, 0, 0)
             label.Size = UDim2.new(1, -28, 1, 0)
-            label.Parent = btn            btn.MouseEnter:Connect(function()
+            label.Parent = btn
+
+            btn.MouseEnter:Connect(function()
                 tween(btn, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackgroundHover})
             end)
             btn.MouseLeave:Connect(function()
@@ -823,7 +838,7 @@ function Sansik:Window(props)
             return obj
         end
 
-        -- ============ SLIDER (Gen2 style) ============
+        -- ============ SLIDER ============
         function Tab:Slider(props)
             local slider = baseElement(56)
             slider.Name = props.name or "Slider"
@@ -850,7 +865,6 @@ function Sansik:Window(props)
             valueLabel.Size = UDim2.new(0.5, 0, 0, 14)
             valueLabel.Parent = slider
 
-            -- Трек с knob внутри (pill)
             local track = Instance.new("Frame")
             track.Name = "Track"
             track.Size = UDim2.new(0, 240, 0, 8)
@@ -868,7 +882,6 @@ function Sansik:Window(props)
             fill.Parent = track
             corner(fill, 4)
 
-            -- Pill-образный knob (вытянутый)
             local knob = Instance.new("Frame")
             knob.Name = "Knob"
             knob.Size = UDim2.new(0, 26, 0, 16)
