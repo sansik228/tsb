@@ -1,4 +1,4 @@
--- Sansik UI Library v6.5
+-- Sansik UI Library v6.55
 -- Full version with auto transparency cache
 
 local Sansik = {}
@@ -1459,18 +1459,30 @@ function Sansik:Window(props)
                 local dropdownAbs = dropdown.AbsolutePosition
                 local mainAbs = Main.AbsolutePosition
                 local mainSize = Main.AbsoluteSize
-                local listH = 200
                 local padding = 10
+
+                -- Динамическая высота попапа
+                local optionsCount = #optionButtons
+                local maxListH = 200
+                local neededH = 48 + optionsCount * 42 + 16
+                local listH = math.min(neededH, maxListH)
+
                 local relX = dropdownAbs.X - mainAbs.X
                 local relY = dropdownAbs.Y - mainAbs.Y + dropdown.AbsoluteSize.Y + 4
+
+                -- Проверка справа
                 if relX + dropdown.AbsoluteSize.X > mainSize.X - padding then
                     relX = mainSize.X - dropdown.AbsoluteSize.X - padding
                 end
                 if relX < padding then relX = padding end
+
+                -- Проверка снизу: влезет ли вниз?
                 if relY + listH > mainSize.Y - padding then
+                    -- Не влезает снизу — открываем сверху
                     relY = dropdownAbs.Y - mainAbs.Y - listH - 4
                 end
                 if relY < padding then relY = padding end
+
                 list.Position = UDim2.new(0, relX, 0, relY)
                 list.Size = UDim2.new(0, dropdown.AbsoluteSize.X, 0, 0)
             end
