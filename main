@@ -1,5 +1,5 @@
--- Sansik UI Library v4.0
--- Added Input, Keybind, Label, Paragraph, Divider
+-- Sansik UI Library v5.0
+-- Added Config save/load + ColorPicker
 
 local Sansik = {}
 Sansik.Flags = {}
@@ -46,6 +46,61 @@ local Services = {
 
 local Player = Services.Players.LocalPlayer
 
+-- ============ КОНФИГ ============
+local CONFIG_FOLDER = "SansikHub"
+local CONFIG_FILE = CONFIG_FOLDER .. "/config.json"
+
+local function ensureFolder()
+    if isfolder and makefolder then
+        pcall(function()
+            if not isfolder(CONFIG_FOLDER) then
+                makefolder(CONFIG_FOLDER)
+            end
+        end)
+    end
+end
+
+local function saveConfig()
+    if not writefile then
+        warn("Sansik | writefile not available")
+        return false
+    end
+    ensureFolder()
+    local data = {}
+    for flag, value in pairs(Sansik.Flags) do
+        if typeof(value) == "Color3" then
+            data[flag] = {__type = "Color3", R = value.R, G = value.G, B = value.B}
+        elseif typeof(value) == "table" then
+            data[flag] = {__type = "table", value = value}
+        else
+            data[flag] = value
+        end
+    end
+    local ok, err = pcall(function()
+        writefile(CONFIG_FILE, Services.HttpService:JSONEncode(data))
+    end)
+    return ok
+end
+
+local function loadConfig()
+    if not readfile or not isfile then return false end
+    if not isfile(CONFIG_FILE) then return false end
+    local ok, data = pcall(function()
+        return Services.HttpService:JSONDecode(readfile(CONFIG_FILE))
+    end)
+    if not ok or type(data) ~= "table" then return false end
+    for flag, value in pairs(data) do
+        if type(value) == "table" and value.__type == "Color3" then
+            Sansik.Flags[flag] = Color3.new(value.R, value.G, value.B)
+        elseif type(value) == "table" and value.__type == "table" then
+            Sansik.Flags[flag] = value.value
+        else
+            Sansik.Flags[flag] = value
+        end
+    end
+    return true
+end
+
 -- ============ ИКОНКИ ============
 local Icons = {}
 local iconsLoaded = false
@@ -73,6 +128,10 @@ local FallbackIcons = {
     ["chevron-up"] = "rbxassetid://10709789084",
     square = "rbxassetid://10709793324",
     keyboard = "rbxassetid://10709790676",
+    save = "rbxassetid://10709792652",
+    download = "rbxassetid://10709789418",
+    trash = "rbxassetid://10709793888",
+    palette = "rbxassetid://10709791548",
 }
 
 local function getIcon(name)
@@ -123,7 +182,6 @@ end
 
 local function makeDraggable(frame, dragFrame)
     local dragging, dragStart, startPos
-
     dragFrame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
@@ -136,7 +194,6 @@ local function makeDraggable(frame, dragFrame)
             end)
         end
     end)
-
     Services.UserInputService.InputChanged:Connect(function(input)
         if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
@@ -146,6 +203,15 @@ local function makeDraggable(frame, dragFrame)
             )
         end
     end)
+end
+
+-- ============ HSV = RGB helpers ============
+local function hsvToRgb(h, s, v)
+    return Color3.fromHSV(h, s, v)
+end
+
+local function rgbToHsv(color)
+    return color:ToHSV()
 end
 
 -- ============ БИБЛИОТЕКА ============
@@ -251,7 +317,6 @@ function Sansik:Window(props)
         btn.ZIndex = 2
         btn.Parent = Topbar
         corner(btn, 8)
-
         if iconName then
             local ico = getIcon(iconName)
             if ico then
@@ -261,14 +326,12 @@ function Sansik:Window(props)
                 btn.ImageColor3 = Sansik.Theme.TextSecondary
             end
         end
-
         btn.MouseEnter:Connect(function()
             tween(btn, 0.15, {BackgroundTransparency = 0.85, ImageColor3 = Sansik.Theme.TextColor})
         end)
         btn.MouseLeave:Connect(function()
             tween(btn, 0.15, {BackgroundTransparency = 1, ImageColor3 = Sansik.Theme.TextSecondary})
         end)
-
         return btn
     end
 
@@ -298,16 +361,13 @@ function Sansik:Window(props)
     corner(Sidebar, 14)
 
     local SidebarCornerFix = Instance.new("Frame")
-    SidebarCornerFix.Name = "CornerFix"
     SidebarCornerFix.Size = UDim2.new(0, 14, 0, 14)
-    SidebarCornerFix.Position = UDim2.new(0, 0, 0, 0)
     SidebarCornerFix.BackgroundColor3 = Sansik.Theme.Topbar
     SidebarCornerFix.BorderSizePixel = 0
     SidebarCornerFix.ZIndex = 1
     SidebarCornerFix.Parent = Sidebar
 
     local SidebarTopRightFix = Instance.new("Frame")
-    SidebarTopRightFix.Name = "TopRightFix"
     SidebarTopRightFix.Size = UDim2.new(0, 14, 0, 14)
     SidebarTopRightFix.Position = UDim2.new(1, -14, 0, 0)
     SidebarTopRightFix.BackgroundColor3 = Sansik.Theme.Topbar
@@ -316,7 +376,6 @@ function Sansik:Window(props)
     SidebarTopRightFix.Parent = Sidebar
 
     local SidebarDivider = Instance.new("Frame")
-    SidebarDivider.Name = "Divider"
     SidebarDivider.Size = UDim2.new(0, 1, 1, 0)
     SidebarDivider.Position = UDim2.new(1, -1, 0, 0)
     SidebarDivider.BackgroundColor3 = Sansik.Theme.ElementStroke
@@ -326,7 +385,6 @@ function Sansik:Window(props)
     SidebarDivider.Parent = Sidebar
 
     local TabList = Instance.new("Frame")
-    TabList.Name = "TabList"
     TabList.Size = UDim2.new(1, -16, 1, -136)
     TabList.Position = UDim2.new(0, 8, 0, 8)
     TabList.BackgroundTransparency = 1
@@ -339,7 +397,6 @@ function Sansik:Window(props)
 
     -- ============ ПРОФИЛЬ ============
     local Profile = Instance.new("Frame")
-    Profile.Name = "Profile"
     Profile.Size = UDim2.new(1, 0, 0, 56)
     Profile.Position = UDim2.new(0, 0, 1, -56)
     Profile.BackgroundColor3 = Sansik.Theme.Sidebar
@@ -349,16 +406,13 @@ function Sansik:Window(props)
     corner(Profile, 10)
 
     local ProfileTopFix = Instance.new("Frame")
-    ProfileTopFix.Name = "TopFix"
     ProfileTopFix.Size = UDim2.new(1, 0, 0, 10)
-    ProfileTopFix.Position = UDim2.new(0, 0, 0, 0)
     ProfileTopFix.BackgroundColor3 = Sansik.Theme.Sidebar
     ProfileTopFix.BorderSizePixel = 0
     ProfileTopFix.ZIndex = 3
     ProfileTopFix.Parent = Profile
 
     local Avatar = Instance.new("ImageLabel")
-    Avatar.Name = "Avatar"
     Avatar.Size = UDim2.new(0, 32, 0, 32)
     Avatar.Position = UDim2.new(0, 14, 0.5, -16)
     Avatar.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
@@ -369,19 +423,12 @@ function Sansik:Window(props)
 
     task.spawn(function()
         local ok, thumb = pcall(function()
-            return Services.Players:GetUserThumbnailAsync(
-                Player.UserId,
-                Enum.ThumbnailType.HeadShot,
-                Enum.ThumbnailSize.Size100x100
-            )
+            return Services.Players:GetUserThumbnailAsync(Player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
         end)
-        if ok and thumb then
-            Avatar.Image = thumb
-        end
+        if ok and thumb then Avatar.Image = thumb end
     end)
 
     local PlayerName = Instance.new("TextLabel")
-    PlayerName.Name = "PlayerName"
     PlayerName.Text = Player.DisplayName or Player.Name
     PlayerName.Font = Enum.Font.GothamMedium
     PlayerName.TextSize = 13
@@ -396,7 +443,6 @@ function Sansik:Window(props)
 
     -- ============ CONTENT ============
     local Content = Instance.new("ScrollingFrame")
-    Content.Name = "Content"
     Content.Size = UDim2.new(1, -204, 1, -86)
     Content.Position = UDim2.new(0, 192, 0, 64)
     Content.BackgroundTransparency = 1
@@ -409,7 +455,6 @@ function Sansik:Window(props)
     Content.Parent = Main
 
     local BottomLeftFix = Instance.new("Frame")
-    BottomLeftFix.Name = "BottomLeftFix"
     BottomLeftFix.Size = UDim2.new(0, 14, 0, 14)
     BottomLeftFix.Position = UDim2.new(0, 0, 1, -14)
     BottomLeftFix.BackgroundColor3 = Sansik.Theme.Sidebar
@@ -419,7 +464,6 @@ function Sansik:Window(props)
     corner(BottomLeftFix, 14)
 
     local BottomRightFix = Instance.new("Frame")
-    BottomRightFix.Name = "BottomRightFix"
     BottomRightFix.Size = UDim2.new(0, 14, 0, 14)
     BottomRightFix.Position = UDim2.new(1, -14, 1, -14)
     BottomRightFix.BackgroundColor3 = Sansik.Theme.Background
@@ -429,18 +473,24 @@ function Sansik:Window(props)
     corner(BottomRightFix, 14)
 
     local DropdownLayer = Instance.new("Frame")
-    DropdownLayer.Name = "DropdownLayer"
     DropdownLayer.Size = UDim2.new(1, 0, 1, 0)
     DropdownLayer.BackgroundTransparency = 1
     DropdownLayer.ClipsDescendants = false
     DropdownLayer.ZIndex = 500
     DropdownLayer.Parent = Main
 
+    -- Слой для ColorPicker popup
+    local ColorPickerLayer = Instance.new("Frame")
+    ColorPickerLayer.Size = UDim2.new(1, 0, 1, 0)
+    ColorPickerLayer.BackgroundTransparency = 1
+    ColorPickerLayer.ClipsDescendants = false
+    ColorPickerLayer.ZIndex = 600
+    ColorPickerLayer.Parent = Main
+
     makeDraggable(Main, Topbar)
 
     -- ============ NOTIFICATIONS ============
     local NotifFrame = Instance.new("Frame")
-    NotifFrame.Name = "Notifications"
     NotifFrame.Size = UDim2.new(0, 280, 1, -40)
     NotifFrame.Position = UDim2.new(1, -300, 0, 20)
     NotifFrame.BackgroundTransparency = 1
@@ -456,13 +506,13 @@ function Sansik:Window(props)
     local Window = {}
     local currentTab = nil
     local openDropdownList = nil
+    local openColorPicker = nil
 
     function Window:Notify(props)
         props = props or {}
         local duration = props.duration or 4
 
         local notif = Instance.new("Frame")
-        notif.Name = "Notification"
         notif.Size = UDim2.new(1, 0, 0, 0)
         notif.BackgroundColor3 = Sansik.Theme.NotificationBackground
         notif.BorderSizePixel = 0
@@ -473,7 +523,6 @@ function Sansik:Window(props)
         stroke(notif, Sansik.Theme.ElementStroke, 1, 0.5)
 
         local accentBar = Instance.new("Frame")
-        accentBar.Name = "AccentBar"
         accentBar.Size = UDim2.new(0, 3, 1, -16)
         accentBar.Position = UDim2.new(0, 8, 0, 8)
         accentBar.BackgroundColor3 = props.accent or Sansik.Theme.Accent
@@ -483,7 +532,6 @@ function Sansik:Window(props)
         corner(accentBar, 2)
 
         local iconFrame = Instance.new("Frame")
-        iconFrame.Name = "IconFrame"
         iconFrame.Size = UDim2.new(0, 28, 0, 28)
         iconFrame.Position = UDim2.new(0, 18, 0, 14)
         iconFrame.BackgroundColor3 = props.accent or Sansik.Theme.Accent
@@ -501,8 +549,7 @@ function Sansik:Window(props)
         iconImg.ZIndex = 3
         iconImg.Parent = iconFrame
 
-        local iconName = props.icon or "info"
-        local ico = getIcon(iconName)
+        local ico = getIcon(props.icon or "info")
         if ico then
             iconImg.Image = ico.id
             if ico.rectOffset then iconImg.ImageRectOffset = ico.rectOffset end
@@ -538,7 +585,6 @@ function Sansik:Window(props)
         NotifContent.Parent = notif
 
         local closeBtn = Instance.new("ImageButton")
-        closeBtn.Name = "CloseBtn"
         closeBtn.Size = UDim2.new(0, 22, 0, 22)
         closeBtn.Position = UDim2.new(1, -30, 0, 10)
         closeBtn.BackgroundTransparency = 1
@@ -546,7 +592,6 @@ function Sansik:Window(props)
         closeBtn.ZIndex = 4
         closeBtn.Parent = notif
         corner(closeBtn, 6)
-
         local closeIco = getIcon("x")
         if closeIco then
             closeBtn.Image = closeIco.id
@@ -557,7 +602,6 @@ function Sansik:Window(props)
         closeBtn.ImageTransparency = 1
 
         local progressBg = Instance.new("Frame")
-        progressBg.Name = "ProgressBg"
         progressBg.Size = UDim2.new(1, -16, 0, 2)
         progressBg.Position = UDim2.new(0, 8, 1, -8)
         progressBg.BackgroundColor3 = Sansik.Theme.ElementStroke
@@ -568,7 +612,6 @@ function Sansik:Window(props)
         corner(progressBg, 1)
 
         local progressFill = Instance.new("Frame")
-        progressFill.Name = "ProgressFill"
         progressFill.Size = UDim2.new(1, 0, 1, 0)
         progressFill.BackgroundColor3 = props.accent or Sansik.Theme.Accent
         progressFill.BorderSizePixel = 0
@@ -631,7 +674,6 @@ function Sansik:Window(props)
         TabIcon.BackgroundTransparency = 1
         TabIcon.ImageColor3 = Sansik.Theme.TabTextColor
         TabIcon.Parent = TabBtn
-
         if iconName then
             local ico = getIcon(iconName)
             if ico then
@@ -676,9 +718,7 @@ function Sansik:Window(props)
 
         local function select()
             if currentTab == Page then return end
-
             closeAllDropdowns()
-
             if currentTab then
                 currentTab.Visible = false
                 local oldBtn = TabList:FindFirstChild(currentTab.Name:gsub("Page", ""))
@@ -690,31 +730,24 @@ function Sansik:Window(props)
                     if icn then tween(icn, 0.2, {ImageColor3 = Sansik.Theme.TabTextColor}) end
                 end
             end
-
             currentTab = Page
             Page.Visible = true
-
             tween(TabBtn, 0.2, {BackgroundTransparency = 0, BackgroundColor3 = Sansik.Theme.TabBackgroundSelected})
             tween(BtnLabel, 0.2, {TextColor3 = Sansik.Theme.TabTextSelected})
             tween(TabIcon, 0.2, {ImageColor3 = Sansik.Theme.TabTextSelected})
         end
 
         TabBtn.MouseButton1Click:Connect(select)
-
         TabBtn.MouseEnter:Connect(function()
             if currentTab ~= Page then
                 tween(TabBtn, 0.15, {BackgroundTransparency = 0.6, BackgroundColor3 = Sansik.Theme.TabBackgroundHover})
             end
         end)
         TabBtn.MouseLeave:Connect(function()
-            if currentTab ~= Page then
-                tween(TabBtn, 0.15, {BackgroundTransparency = 1})
-            end
+            if currentTab ~= Page then tween(TabBtn, 0.15, {BackgroundTransparency = 1}) end
         end)
 
-        if not currentTab then
-            select()
-        end
+        if not currentTab then select() end
 
         local Tab = {}
         local elementOrder = 0
@@ -740,7 +773,6 @@ function Sansik:Window(props)
         function Tab:Button(props)
             local btn = baseElement(44)
             btn.Name = props.name or "Button"
-
             local label = Instance.new("TextLabel")
             label.Text = props.name or "Button"
             label.Font = Enum.Font.GothamMedium
@@ -771,9 +803,7 @@ function Sansik:Window(props)
                 if props.callback then pcall(props.callback) end
             end)
 
-            return {
-                Set = function(self, newText) label.Text = newText end
-            }
+            return { Set = function(self, newText) label.Text = newText end }
         end
 
         -- ============ TOGGLE ============
@@ -804,7 +834,6 @@ function Sansik:Window(props)
             desc.Parent = toggle
 
             local switchBg = Instance.new("Frame")
-            switchBg.Name = "SwitchBg"
             switchBg.Size = UDim2.new(0, 48, 0, 26)
             switchBg.Position = UDim2.new(1, -62, 0.5, -13)
             switchBg.BackgroundTransparency = 1
@@ -814,7 +843,6 @@ function Sansik:Window(props)
             local switchStroke = stroke(switchBg, Sansik.Theme.ToggleDisabledStroke, 1.5, 0)
 
             local indicator = Instance.new("Frame")
-            indicator.Name = "Indicator"
             indicator.Size = UDim2.new(0, 20, 0, 20)
             indicator.Position = UDim2.new(0, 3, 0.5, -10)
             indicator.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -823,6 +851,7 @@ function Sansik:Window(props)
             corner(indicator, 10)
 
             local state = props.value or false
+            if props.flag and Sansik.Flags[props.flag] ~= nil then state = Sansik.Flags[props.flag] end
 
             local function updateSwitch(animated)
                 if state then
@@ -868,7 +897,6 @@ function Sansik:Window(props)
             }
 
             if props.flag then Sansik.Flags[props.flag] = state end
-
             return obj
         end
 
@@ -876,7 +904,6 @@ function Sansik:Window(props)
         function Tab:Slider(props)
             local slider = baseElement(56)
             slider.Name = props.name or "Slider"
-
             local label = Instance.new("TextLabel")
             label.Text = props.name or "Slider"
             label.Font = Enum.Font.GothamMedium
@@ -889,7 +916,6 @@ function Sansik:Window(props)
             label.Parent = slider
 
             local valueLabel = Instance.new("TextLabel")
-            valueLabel.Text = tostring(props.value or props.range[1]) .. (props.suffix and (" " .. props.suffix) or "")
             valueLabel.Font = Enum.Font.Gotham
             valueLabel.TextSize = 11
             valueLabel.TextColor3 = Sansik.Theme.TextSecondary
@@ -900,7 +926,6 @@ function Sansik:Window(props)
             valueLabel.Parent = slider
 
             local track = Instance.new("Frame")
-            track.Name = "Track"
             track.Size = UDim2.new(0, 240, 0, 8)
             track.Position = UDim2.new(1, -254, 0.5, -4)
             track.BackgroundColor3 = Sansik.Theme.SliderBackground
@@ -909,7 +934,6 @@ function Sansik:Window(props)
             corner(track, 4)
 
             local fill = Instance.new("Frame")
-            fill.Name = "Fill"
             fill.Size = UDim2.new(0, 0, 1, 0)
             fill.BackgroundColor3 = Sansik.Theme.SliderProgress
             fill.BorderSizePixel = 0
@@ -917,7 +941,6 @@ function Sansik:Window(props)
             corner(fill, 4)
 
             local knob = Instance.new("Frame")
-            knob.Name = "Knob"
             knob.Size = UDim2.new(0, 26, 0, 16)
             knob.Position = UDim2.new(0, 0, 0.5, -8)
             knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -930,6 +953,7 @@ function Sansik:Window(props)
             local max = props.range[2]
             local increment = props.increment or 1
             local currentValue = props.value or min
+            if props.flag and Sansik.Flags[props.flag] ~= nil then currentValue = Sansik.Flags[props.flag] end
 
             local function setValue(v, animated, silent)
                 currentValue = math.clamp(v, min, max)
@@ -965,13 +989,11 @@ function Sansik:Window(props)
                     updateFromInput(input)
                 end
             end)
-
             Services.UserInputService.InputChanged:Connect(function(input)
                 if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
                     updateFromInput(input)
                 end
             end)
-
             Services.UserInputService.InputEnded:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                     dragging = false
@@ -980,13 +1002,9 @@ function Sansik:Window(props)
 
             local obj = {
                 value = currentValue,
-                Set = function(self, v, silent)
-                    setValue(v, true, silent)
-                end
+                Set = function(self, v, silent) setValue(v, true, silent) end
             }
-
             if props.flag then Sansik.Flags[props.flag] = currentValue end
-
             return obj
         end
 
@@ -1022,14 +1040,12 @@ function Sansik:Window(props)
             selectedLabel.Parent = dropdown
 
             local arrow = Instance.new("ImageLabel")
-            arrow.Name = "Arrow"
             arrow.Size = UDim2.new(0, 14, 0, 14)
             arrow.Position = UDim2.new(1, -24, 0.5, -7)
             arrow.BackgroundTransparency = 1
             arrow.ImageColor3 = Sansik.Theme.TextSecondary
             arrow.ZIndex = 2
             arrow.Parent = dropdown
-
             local arrowIco = getIcon("chevron-down")
             if arrowIco then
                 arrow.Image = arrowIco.id
@@ -1056,7 +1072,6 @@ function Sansik:Window(props)
             end)
 
             local list = Instance.new("Frame")
-            list.Name = "DropdownList"
             list.Size = UDim2.new(0, 0, 0, 0)
             list.Position = UDim2.new(0, 0, 0, 0)
             list.BackgroundColor3 = Sansik.Theme.DropdownBackground
@@ -1071,14 +1086,11 @@ function Sansik:Window(props)
             local function updateListPosition()
                 local dropdownAbs = dropdown.AbsolutePosition
                 local mainAbs = Main.AbsolutePosition
-                local relX = dropdownAbs.X - mainAbs.X
-                local relY = dropdownAbs.Y - mainAbs.Y + dropdown.AbsoluteSize.Y + 4
-                list.Position = UDim2.new(0, relX, 0, relY)
+                list.Position = UDim2.new(0, dropdownAbs.X - mainAbs.X, 0, dropdownAbs.Y - mainAbs.Y + dropdown.AbsoluteSize.Y + 4)
                 list.Size = UDim2.new(0, dropdown.AbsoluteSize.X, 0, 0)
             end
 
             local searchContainer = Instance.new("Frame")
-            searchContainer.Name = "SearchContainer"
             searchContainer.Size = UDim2.new(1, -16, 0, 32)
             searchContainer.Position = UDim2.new(0, 8, 0, 8)
             searchContainer.BackgroundColor3 = Sansik.Theme.DropdownOption
@@ -1088,14 +1100,12 @@ function Sansik:Window(props)
             corner(searchContainer, 6)
 
             local searchIcon = Instance.new("ImageLabel")
-            searchIcon.Name = "SearchIcon"
             searchIcon.Size = UDim2.new(0, 14, 0, 14)
             searchIcon.Position = UDim2.new(0, 10, 0.5, -7)
             searchIcon.BackgroundTransparency = 1
             searchIcon.ImageColor3 = Sansik.Theme.TextSecondary
             searchIcon.ZIndex = 503
             searchIcon.Parent = searchContainer
-
             local searchIco = getIcon("search")
             if searchIco then
                 searchIcon.Image = searchIco.id
@@ -1104,7 +1114,6 @@ function Sansik:Window(props)
             end
 
             local searchBox = Instance.new("TextBox")
-            searchBox.Name = "Search"
             searchBox.Size = UDim2.new(1, -36, 1, 0)
             searchBox.Position = UDim2.new(0, 32, 0, 0)
             searchBox.BackgroundTransparency = 1
@@ -1120,7 +1129,6 @@ function Sansik:Window(props)
             searchBox.Parent = searchContainer
 
             local optionsScroll = Instance.new("ScrollingFrame")
-            optionsScroll.Name = "Options"
             optionsScroll.Size = UDim2.new(1, -16, 1, -48)
             optionsScroll.Position = UDim2.new(0, 8, 0, 48)
             optionsScroll.BackgroundTransparency = 1
@@ -1138,6 +1146,7 @@ function Sansik:Window(props)
             optionsLayout.Parent = optionsScroll
 
             local currentValue = props.value or nil
+            if props.flag and Sansik.Flags[props.flag] ~= nil then currentValue = Sansik.Flags[props.flag] end
             local optionButtons = {}
 
             local function updateSelected()
@@ -1151,9 +1160,7 @@ function Sansik:Window(props)
                 tween(list, 0.2, {Size = UDim2.new(0, dropdown.AbsoluteSize.X, 0, 0), BackgroundTransparency = 1})
                 task.wait(0.2)
                 list.Visible = false
-                if openDropdownList == list then
-                    openDropdownList = nil
-                end
+                if openDropdownList == list then openDropdownList = nil end
                 tween(dropdown, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackground})
             end
 
@@ -1191,20 +1198,20 @@ function Sansik:Window(props)
 
                 local function setState(isSelected)
                     if isSelected then
-                        local checkIco = getIcon("check")
-                        if checkIco then
-                            optIcon.Image = checkIco.id
-                            if checkIco.rectOffset then optIcon.ImageRectOffset = checkIco.rectOffset end
-                            if checkIco.rectSize then optIcon.ImageRectSize = checkIco.rectSize end
+                        local ci = getIcon("check")
+                        if ci then
+                            optIcon.Image = ci.id
+                            if ci.rectOffset then optIcon.ImageRectOffset = ci.rectOffset end
+                            if ci.rectSize then optIcon.ImageRectSize = ci.rectSize end
                         end
                         optIcon.ImageColor3 = Sansik.Theme.TextColor
                         optionBtn.BackgroundColor3 = Sansik.Theme.DropdownOptionHover
                     else
-                        local sqIco = getIcon("square")
-                        if sqIco then
-                            optIcon.Image = sqIco.id
-                            if sqIco.rectOffset then optIcon.ImageRectOffset = sqIco.rectOffset end
-                            if sqIco.rectSize then optIcon.ImageRectSize = sqIco.rectSize end
+                        local si = getIcon("square")
+                        if si then
+                            optIcon.Image = si.id
+                            if si.rectOffset then optIcon.ImageRectOffset = si.rectOffset end
+                            if si.rectSize then optIcon.ImageRectSize = si.rectSize end
                         end
                         optIcon.ImageColor3 = Sansik.Theme.TextSecondary
                         optionBtn.BackgroundColor3 = Sansik.Theme.DropdownOption
@@ -1232,20 +1239,20 @@ function Sansik:Window(props)
                         if ico then
                             local isSel = (optBtn.Name == currentValue)
                             if isSel then
-                                local checkIco = getIcon("check")
-                                if checkIco then
-                                    ico.Image = checkIco.id
-                                    if checkIco.rectOffset then ico.ImageRectOffset = checkIco.rectOffset end
-                                    if checkIco.rectSize then ico.ImageRectSize = checkIco.rectSize end
+                                local ci = getIcon("check")
+                                if ci then
+                                    ico.Image = ci.id
+                                    if ci.rectOffset then ico.ImageRectOffset = ci.rectOffset end
+                                    if ci.rectSize then ico.ImageRectSize = ci.rectSize end
                                 end
                                 ico.ImageColor3 = Sansik.Theme.TextColor
                                 optBtn.BackgroundColor3 = Sansik.Theme.DropdownOptionHover
                             else
-                                local sqIco = getIcon("square")
-                                if sqIco then
-                                    ico.Image = sqIco.id
-                                    if sqIco.rectOffset then ico.ImageRectOffset = sqIco.rectOffset end
-                                    if sqIco.rectSize then ico.ImageRectSize = sqIco.rectSize end
+                                local si = getIcon("square")
+                                if si then
+                                    ico.Image = si.id
+                                    if si.rectOffset then ico.ImageRectOffset = si.rectOffset end
+                                    if si.rectSize then ico.ImageRectSize = si.rectSize end
                                 end
                                 ico.ImageColor3 = Sansik.Theme.TextSecondary
                                 optBtn.BackgroundColor3 = Sansik.Theme.DropdownOption
@@ -1284,7 +1291,6 @@ function Sansik:Window(props)
                         openDropdownList.Visible = false
                         openDropdownList.Size = UDim2.new(0, 0, 0, 0)
                     end
-
                     dropdown:SetAttribute("Open", true)
                     arrow.Rotation = 180
                     updateListPosition()
@@ -1296,9 +1302,7 @@ function Sansik:Window(props)
             end)
 
             Page:GetPropertyChangedSignal("Visible"):Connect(function()
-                if not Page.Visible and list.Visible then
-                    list.Visible = false
-                end
+                if not Page.Visible and list.Visible then list.Visible = false end
             end)
 
             local obj = {
@@ -1311,20 +1315,20 @@ function Sansik:Window(props)
                         if ico then
                             local isSel = (optBtn.Name == currentValue)
                             if isSel then
-                                local checkIco = getIcon("check")
-                                if checkIco then
-                                    ico.Image = checkIco.id
-                                    if checkIco.rectOffset then ico.ImageRectOffset = checkIco.rectOffset end
-                                    if checkIco.rectSize then ico.ImageRectSize = checkIco.rectSize end
+                                local ci = getIcon("check")
+                                if ci then
+                                    ico.Image = ci.id
+                                    if ci.rectOffset then ico.ImageRectOffset = ci.rectOffset end
+                                    if ci.rectSize then ico.ImageRectSize = ci.rectSize end
                                 end
                                 ico.ImageColor3 = Sansik.Theme.TextColor
                                 optBtn.BackgroundColor3 = Sansik.Theme.DropdownOptionHover
                             else
-                                local sqIco = getIcon("square")
-                                if sqIco then
-                                    ico.Image = sqIco.id
-                                    if sqIco.rectOffset then ico.ImageRectOffset = sqIco.rectOffset end
-                                    if sqIco.rectSize then ico.ImageRectSize = sqIco.rectSize end
+                                local si = getIcon("square")
+                                if si then
+                                    ico.Image = si.id
+                                    if si.rectOffset then ico.ImageRectOffset = si.rectOffset end
+                                    if si.rectSize then ico.ImageRectSize = si.rectSize end
                                 end
                                 ico.ImageColor3 = Sansik.Theme.TextSecondary
                                 optBtn.BackgroundColor3 = Sansik.Theme.DropdownOption
@@ -1335,9 +1339,7 @@ function Sansik:Window(props)
                     if not silent and props.callback then pcall(props.callback, currentValue) end
                 end,
                 Refresh = function(self, newOptions)
-                    for _, optBtn in ipairs(optionButtons) do
-                        optBtn:Destroy()
-                    end
+                    for _, optBtn in ipairs(optionButtons) do optBtn:Destroy() end
                     optionButtons = {}
                     for _, optionName in ipairs(newOptions) do
                         table.insert(optionButtons, createOption(optionName))
@@ -1346,7 +1348,6 @@ function Sansik:Window(props)
             }
 
             if props.flag then Sansik.Flags[props.flag] = currentValue end
-
             return obj
         end
 
@@ -1368,12 +1369,12 @@ function Sansik:Window(props)
             label.Parent = input
 
             local inputBox = Instance.new("TextBox")
-            inputBox.Name = "InputBox"
             inputBox.Size = UDim2.new(0, 200, 0, 32)
             inputBox.Position = UDim2.new(1, -214, 0.5, -16)
             inputBox.BackgroundColor3 = Sansik.Theme.InputBackground
             inputBox.BorderSizePixel = 0
             inputBox.Text = props.value or ""
+            if props.flag and Sansik.Flags[props.flag] ~= nil then inputBox.Text = Sansik.Flags[props.flag] end
             inputBox.PlaceholderText = props.placeholder or "Enter text..."
             inputBox.Font = Enum.Font.Gotham
             inputBox.TextSize = 12
@@ -1384,25 +1385,22 @@ function Sansik:Window(props)
             inputBox.ZIndex = 3
             inputBox.Parent = input
             corner(inputBox, 8)
-
             local inputPadding = Instance.new("UIPadding")
             inputPadding.PaddingLeft = UDim.new(0, 12)
             inputPadding.PaddingRight = UDim.new(0, 12)
             inputPadding.Parent = inputBox
 
-            local currentValue = props.value or ""
+            local currentValue = inputBox.Text
 
             inputBox.Focused:Connect(function()
                 tween(input, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackgroundHover})
             end)
-            inputBox.FocusLost:Connect(function(enterPressed)
+            inputBox.FocusLost:Connect(function()
                 tween(input, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackground})
                 currentValue = inputBox.Text
                 if props.flag then Sansik.Flags[props.flag] = currentValue end
                 if props.callback then pcall(props.callback, currentValue) end
-                if props.clearOnFocusLost then
-                    inputBox.Text = ""
-                end
+                if props.clearOnFocusLost then inputBox.Text = "" end
             end)
 
             local obj = {
@@ -1416,7 +1414,6 @@ function Sansik:Window(props)
             }
 
             if props.flag then Sansik.Flags[props.flag] = currentValue end
-
             return obj
         end
 
@@ -1438,12 +1435,12 @@ function Sansik:Window(props)
             label.Parent = keybind
 
             local keyBtn = Instance.new("TextButton")
-            keyBtn.Name = "KeyBtn"
             keyBtn.Size = UDim2.new(0, 100, 0, 32)
             keyBtn.Position = UDim2.new(1, -114, 0.5, -16)
             keyBtn.BackgroundColor3 = Sansik.Theme.InputBackground
             keyBtn.BorderSizePixel = 0
             keyBtn.Text = props.value or "None"
+            if props.flag and Sansik.Flags[props.flag] ~= nil then keyBtn.Text = Sansik.Flags[props.flag] or "None" end
             keyBtn.Font = Enum.Font.Gotham
             keyBtn.TextSize = 12
             keyBtn.TextColor3 = Sansik.Theme.InputText
@@ -1453,9 +1450,10 @@ function Sansik:Window(props)
             corner(keyBtn, 8)
 
             local listening = false
-            local currentKey = props.value or nil
+            local currentKey = props.value or Sansik.Flags[props.flag]
+            local pressCallback = props.onPress
 
-            local inputConnection = Services.UserInputService.InputBegan:Connect(function(input, processed)
+            Services.UserInputService.InputBegan:Connect(function(input, processed)
                 if processed then return end
                 if listening then
                     if input.KeyCode ~= Enum.KeyCode.Unknown then
@@ -1469,7 +1467,7 @@ function Sansik:Window(props)
                     end
                 else
                     if currentKey and input.KeyCode.Name == currentKey then
-                        if props.onPress then pcall(props.onPress) end
+                        if pressCallback then pcall(pressCallback) end
                     end
                 end
             end)
@@ -1510,7 +1508,372 @@ function Sansik:Window(props)
             }
 
             if props.flag then Sansik.Flags[props.flag] = currentKey end
+            return obj
+        end
 
+        -- ============ COLORPICKER ============
+        function Tab:ColorPicker(props)
+            local cp = baseElement(46)
+            cp.Name = props.name or "ColorPicker"
+
+            local label = Instance.new("TextLabel")
+            label.Text = props.name or "ColorPicker"
+            label.Font = Enum.Font.GothamMedium
+            label.TextSize = 13
+            label.TextColor3 = Sansik.Theme.TextColor
+            label.BackgroundTransparency = 1
+            label.TextXAlignment = Enum.TextXAlignment.Left
+            label.Position = UDim2.new(0, 14, 0, 0)
+            label.Size = UDim2.new(0.5, 0, 1, 0)
+            label.ZIndex = 2
+            label.Parent = cp
+
+            -- Превью цвета справа
+            local preview = Instance.new("Frame")
+            preview.Size = UDim2.new(0, 60, 0, 28)
+            preview.Position = UDim2.new(1, -74, 0.5, -14)
+            preview.BackgroundColor3 = props.color or Color3.fromRGB(255, 255, 255)
+            preview.BorderSizePixel = 0
+            preview.ZIndex = 2
+            preview.Parent = cp
+            corner(preview, 6)
+            stroke(preview, Sansik.Theme.ElementStroke, 1, 0)
+
+            local currentColor = props.color or Color3.fromRGB(255, 255, 255)
+            if props.flag and typeof(Sansik.Flags[props.flag]) == "Color3" then
+                currentColor = Sansik.Flags[props.flag]
+                preview.BackgroundColor3 = currentColor
+            end
+
+            local clickable = Instance.new("TextButton")
+            clickable.Size = UDim2.new(1, 0, 1, 0)
+            clickable.BackgroundTransparency = 1
+            clickable.Text = ""
+            clickable.AutoButtonColor = false
+            clickable.ZIndex = 3
+            clickable.Parent = cp
+            corner(clickable, 10)
+
+            clickable.MouseEnter:Connect(function()
+                tween(cp, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackgroundHover})
+            end)
+            clickable.MouseLeave:Connect(function()
+                tween(cp, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackground})
+            end)
+
+            -- Popup
+            local popup = Instance.new("Frame")
+            popup.Name = "ColorPickerPopup"
+            popup.Size = UDim2.new(0, 320, 0, 220)
+            popup.BackgroundColor3 = Sansik.Theme.DropdownBackground
+            popup.BorderSizePixel = 0
+            popup.Visible = false
+            popup.ClipsDescendants = false
+            popup.ZIndex = 601
+            popup.Parent = ColorPickerLayer
+            corner(popup, 10)
+            stroke(popup, Sansik.Theme.ElementStroke, 1, 0.5)
+
+            local function updatePopupPosition()
+                local cpAbs = cp.AbsolutePosition
+                local mainAbs = Main.AbsolutePosition
+                local relX = cpAbs.X - mainAbs.X
+                local relY = cpAbs.Y - mainAbs.Y + cp.AbsoluteSize.Y + 4
+                -- Если не влезает снизу — открываем сверху
+                if relY + 220 > Main.AbsoluteSize.Y then
+                    relY = cpAbs.Y - mainAbs.Y - 220 - 4
+                end
+                popup.Position = UDim2.new(0, relX, 0, relY)
+            end
+
+            -- SV area (насыщенность/яркость) — квадрат 150x150
+            local svArea = Instance.new("Frame")
+            svArea.Size = UDim2.new(0, 150, 0, 150)
+            svArea.Position = UDim2.new(0, 14, 0, 14)
+            svArea.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+            svArea.BorderSizePixel = 0
+            svArea.ZIndex = 602
+            svArea.Parent = popup
+            corner(svArea, 6)
+            stroke(svArea, Sansik.Theme.ElementStroke, 1, 0)
+
+            -- Градиенты для SV
+            local whiteGradient = Instance.new("Frame")
+            whiteGradient.Size = UDim2.new(1, 0, 1, 0)
+            whiteGradient.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            whiteGradient.BorderSizePixel = 0
+            whiteGradient.ZIndex = 603
+            whiteGradient.Parent = svArea
+            corner(whiteGradient, 6)
+            local wg = Instance.new("UIGradient")
+            wg.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 0),
+                NumberSequenceKeypoint.new(1, 1),
+            })
+            wg.Parent = whiteGradient
+
+            local blackGradient = Instance.new("Frame")
+            blackGradient.Size = UDim2.new(1, 0, 1, 0)
+            blackGradient.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+            blackGradient.BorderSizePixel = 0
+            blackGradient.ZIndex = 604
+            blackGradient.Parent = svArea
+            corner(blackGradient, 6)
+            local bg = Instance.new("UIGradient")
+            bg.Rotation = 90
+            bg.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 0),
+                NumberSequenceKeypoint.new(1, 1),
+            })
+            bg.Parent = blackGradient
+
+            -- Кружок SV
+            local svDot = Instance.new("Frame")
+            svDot.Size = UDim2.new(0, 16, 0, 16)
+            svDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            svDot.BorderSizePixel = 0
+            svDot.ZIndex = 605
+            svDot.Parent = svArea
+            corner(svDot, 8)
+            stroke(svDot, Color3.fromRGB(0, 0, 0), 2, 0)
+
+            -- Hue slider
+            local hueSlider = Instance.new("Frame")
+            hueSlider.Size = UDim2.new(0, 16, 0, 150)
+            hueSlider.Position = UDim2.new(0, 178, 0, 14)
+            hueSlider.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            hueSlider.BorderSizePixel = 0
+            hueSlider.ZIndex = 602
+            hueSlider.Parent = popup
+            corner(hueSlider, 8)
+            local hueGradient = Instance.new("UIGradient")
+            hueGradient.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
+                ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
+                ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
+                ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
+                ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)),
+            })
+            hueGradient.Rotation = 90
+            hueGradient.Parent = hueSlider
+
+            local hueDot = Instance.new("Frame")
+            hueDot.Size = UDim2.new(0, 24, 0, 10)
+            hueDot.Position = UDim2.new(0.5, -12, 0, 0)
+            hueDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            hueDot.BorderSizePixel = 0
+            hueDot.ZIndex = 605
+            hueDot.Parent = hueSlider
+            corner(hueDot, 5)
+            stroke(hueDot, Color3.fromRGB(0, 0, 0), 1.5, 0)
+
+            -- Alpha slider (опционально, не используем, но оставим заглушку)
+            -- Preview справа от HSV
+            local previewBig = Instance.new("Frame")
+            previewBig.Size = UDim2.new(0, 100, 0, 60)
+            previewBig.Position = UDim2.new(0, 208, 0, 14)
+            previewBig.BackgroundColor3 = currentColor
+            previewBig.BorderSizePixel = 0
+            previewBig.ZIndex = 602
+            previewBig.Parent = popup
+            corner(previewBig, 6)
+            stroke(previewBig, Sansik.Theme.ElementStroke, 1, 0)
+
+            -- HEX Input
+            local hexBox = Instance.new("TextBox")
+            hexBox.Size = UDim2.new(0, 100, 0, 26)
+            hexBox.Position = UDim2.new(0, 208, 0, 82)
+            hexBox.BackgroundColor3 = Sansik.Theme.InputBackground
+            hexBox.BorderSizePixel = 0
+            hexBox.Text = string.format("#%02X%02X%02X", currentColor.R * 255, currentColor.G * 255, currentColor.B * 255)
+            hexBox.Font = Enum.Font.Gotham
+            hexBox.TextSize = 11
+            hexBox.TextColor3 = Sansik.Theme.InputText
+            hexBox.TextXAlignment = Enum.TextXAlignment.Center
+            hexBox.ClearTextOnFocus = false
+            hexBox.ZIndex = 602
+            hexBox.Parent = popup
+            corner(hexBox, 6)
+
+            -- Alpha % (заглушка)
+            local alphaBox = Instance.new("TextBox")
+            alphaBox.Size = UDim2.new(0, 100, 0, 26)
+            alphaBox.Position = UDim2.new(0, 208, 0, 114)
+            alphaBox.BackgroundColor3 = Sansik.Theme.InputBackground
+            alphaBox.BorderSizePixel = 0
+            alphaBox.Text = "100%"
+            alphaBox.Font = Enum.Font.Gotham
+            alphaBox.TextSize = 11
+            alphaBox.TextColor3 = Sansik.Theme.InputText
+            alphaBox.TextXAlignment = Enum.TextXAlignment.Center
+            alphaBox.ClearTextOnFocus = false
+            alphaBox.ZIndex = 602
+            alphaBox.Parent = popup
+            corner(alphaBox, 6)
+
+            -- Close button (крестик сверху справа попапа)
+            local popupClose = Instance.new("ImageButton")
+            popupClose.Size = UDim2.new(0, 20, 0, 20)
+            popupClose.Position = UDim2.new(1, -26, 0, 6)
+            popupClose.BackgroundTransparency = 1
+            popupClose.Image = ""
+            popupClose.ZIndex = 610
+            popupClose.Parent = popup
+            local popupCloseIco = getIcon("x")
+            if popupCloseIco then
+                popupClose.Image = popupCloseIco.id
+                if popupCloseIco.rectOffset then popupClose.ImageRectOffset = popupCloseIco.rectOffset end
+                if popupCloseIco.rectSize then popupClose.ImageRectSize = popupCloseIco.rectSize end
+                popupClose.ImageColor3 = Sansik.Theme.TextSecondary
+            end
+
+            local h, s, v = currentColor:ToHSV()
+
+            local function updateFromHSV()
+                local newColor = Color3.fromHSV(h, s, v)
+                preview.BackgroundColor3 = newColor
+                previewBig.BackgroundColor3 = newColor
+                svArea.BackgroundColor3 = Color3.fromHSV(h, 1, 1)
+                svDot.Position = UDim2.new(s, -8, 1 - v, -8)
+                hueDot.Position = UDim2.new(0.5, -12, h, -5)
+                hexBox.Text = string.format("#%02X%02X%02X", newColor.R * 255, newColor.G * 255, newColor.B * 255)
+                currentColor = newColor
+                if props.flag then Sansik.Flags[props.flag] = newColor end
+                if props.callback then pcall(props.callback, newColor) end
+            end
+            updateFromHSV()
+
+            -- SV drag
+            local svDragging = false
+            local svInput = Instance.new("TextButton")
+            svInput.Size = UDim2.new(1, 0, 1, 0)
+            svInput.BackgroundTransparency = 1
+            svInput.Text = ""
+            svInput.AutoButtonColor = false
+            svInput.ZIndex = 606
+            svInput.Parent = svArea
+
+            local function updateSV(input)
+                local relX = math.clamp((input.Position.X - svArea.AbsolutePosition.X) / svArea.AbsoluteSize.X, 0, 1)
+                local relY = math.clamp((input.Position.Y - svArea.AbsolutePosition.Y) / svArea.AbsoluteSize.Y, 0, 1)
+                s = relX
+                v = 1 - relY
+                updateFromHSV()
+            end
+
+            svInput.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    svDragging = true
+                    updateSV(input)
+                end
+            end)
+            Services.UserInputService.InputChanged:Connect(function(input)
+                if svDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                    updateSV(input)
+                end
+            end)
+            Services.UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    svDragging = false
+                end
+            end)
+
+            -- Hue drag
+            local hueDragging = false
+            local hueInput = Instance.new("TextButton")
+            hueInput.Size = UDim2.new(1, 0, 1, 0)
+            hueInput.BackgroundTransparency = 1
+            hueInput.Text = ""
+            hueInput.AutoButtonColor = false
+            hueInput.ZIndex = 606
+            hueInput.Parent = hueSlider
+
+            local function updateHue(input)
+                local relY = math.clamp((input.Position.Y - hueSlider.AbsolutePosition.Y) / hueSlider.AbsoluteSize.Y, 0, 1)
+                h = relY
+                updateFromHSV()
+            end
+
+            hueInput.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    hueDragging = true
+                    updateHue(input)
+                end
+            end)
+            Services.UserInputService.InputChanged:Connect(function(input)
+                if hueDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                    updateHue(input)
+                end
+            end)
+            Services.UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    hueDragging = false
+                end
+            end)
+
+            -- HEX input
+            hexBox.FocusLost:Connect(function()
+                local hex = hexBox.Text:gsub("#", "")
+                if #hex == 6 then
+                    local r = tonumber(hex:sub(1,2), 16)
+                    local g = tonumber(hex:sub(3,4), 16)
+                    local b = tonumber(hex:sub(5,6), 16)
+                    if r and g and b then
+                        local newColor = Color3.fromRGB(r, g, b)
+                        h, s, v = newColor:ToHSV()
+                        updateFromHSV()
+                    end
+                end
+            end)
+
+            -- Открытие / закрытие попапа
+            clickable.MouseButton1Click:Connect(function()
+                if popup.Visible then
+                    popup.Visible = false
+                    if openColorPicker == popup then openColorPicker = nil end
+                    tween(cp, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackground})
+                else
+                    if openColorPicker and openColorPicker ~= popup then
+                        openColorPicker.Visible = false
+                    end
+                    updatePopupPosition()
+                    popup.Visible = true
+                    openColorPicker = popup
+                    tween(cp, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackgroundHover})
+                end
+            end)
+
+            popupClose.MouseButton1Click:Connect(function()
+                popup.Visible = false
+                if openColorPicker == popup then openColorPicker = nil end
+                tween(cp, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackground})
+            end)
+
+            -- Скрытие при смене вкладки
+            Page:GetPropertyChangedSignal("Visible"):Connect(function()
+                if not Page.Visible and popup.Visible then
+                    popup.Visible = false
+                    if openColorPicker == popup then openColorPicker = nil end
+                end
+            end)
+
+            local obj = {
+                value = currentColor,
+                Set = function(self, color, silent)
+                    currentColor = color
+                    h, s, v = color:ToHSV()
+                    updateFromHSV()
+                    if props.flag then Sansik.Flags[props.flag] = color end
+                    if not silent and props.callback then pcall(props.callback, color) end
+                end,
+                GetColor = function(self)
+                    return currentColor
+                end
+            }
+
+            if props.flag then Sansik.Flags[props.flag] = currentColor end
             return obj
         end
 
@@ -1532,7 +1895,6 @@ function Sansik:Window(props)
             labelIcon.BackgroundTransparency = 1
             labelIcon.ImageColor3 = props.color or Sansik.Theme.TextSecondary
             labelIcon.Parent = labelFrame
-
             if props.icon then
                 local ico = getIcon(props.icon)
                 if ico then
@@ -1554,9 +1916,7 @@ function Sansik:Window(props)
             labelText.Parent = labelFrame
 
             return {
-                Set = function(self, newText)
-                    labelText.Text = newText
-                end
+                Set = function(self, newText) labelText.Text = newText end
             }
         end
 
@@ -1609,7 +1969,6 @@ function Sansik:Window(props)
         -- ============ DIVIDER ============
         function Tab:Divider()
             local divider = Instance.new("Frame")
-            divider.Name = "Divider"
             divider.Size = UDim2.new(1, -20, 0, 1)
             divider.Position = UDim2.new(0, 10, 0, 0)
             divider.BackgroundColor3 = Sansik.Theme.ElementStroke
@@ -1617,11 +1976,8 @@ function Sansik:Window(props)
             divider.BackgroundTransparency = 0.5
             divider.LayoutOrder = nextOrder()
             divider.Parent = Page
-
             return {
-                Set = function(self, visible)
-                    divider.Visible = visible
-                end
+                Set = function(self, visible) divider.Visible = visible end
             }
         end
 
@@ -1653,6 +2009,15 @@ function Sansik:Window(props)
         return Tab
     end
 
+    -- ============ CONFIG METHODS ============
+    function Window:SaveConfig()
+        return saveConfig()
+    end
+
+    function Window:LoadConfig()
+        return loadConfig()
+    end
+
     -- Minimize / Close
     local Minimized = false
 
@@ -1671,6 +2036,10 @@ function Sansik:Window(props)
                 openDropdownList.Visible = false
                 openDropdownList = nil
             end
+            if openColorPicker then
+                openColorPicker.Visible = false
+                openColorPicker = nil
+            end
             setContentVisible(false)
             tween(Main, 0.35, {Size = UDim2.new(0, 600, 0, 56)})
         else
@@ -1682,10 +2051,8 @@ function Sansik:Window(props)
 
     CloseBtn.MouseButton1Click:Connect(function()
         setContentVisible(false)
-        if openDropdownList then
-            openDropdownList.Visible = false
-            openDropdownList = nil
-        end
+        if openDropdownList then openDropdownList.Visible = false openDropdownList = nil end
+        if openColorPicker then openColorPicker.Visible = false openColorPicker = nil end
         Main.ClipsDescendants = true
         tween(Main, 0.25, {Size = UDim2.new(0, 600, 0, 0), BackgroundTransparency = 1})
         task.wait(0.3)
