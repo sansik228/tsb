@@ -742,7 +742,7 @@ function Sansik:Window(props)
                 end
             end
         end)
-    end
+    end)
 
     cacheTransparencies(Main)
 
