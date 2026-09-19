@@ -1,4 +1,4 @@
--- Sansik UI Library v7.0
+-- Sansik UI Library v7.05
 -- Clean version: no Dropdown, no ColorPicker, no MultiDropdown
 
 local Sansik = {}
@@ -322,7 +322,7 @@ function Sansik:Window(props)
         keyInput.Position = UDim2.new(0.5, -150, 0, 100)
         keyInput.BackgroundColor3 = Sansik.Theme.InputBackground
         keyInput.BorderSizePixel = 0
-        keyInput.PlaceholderText = "Введите ключ..."
+        keyInput.PlaceholderText = "Enter Key..."
         keyInput.Font = Enum.Font.Gotham
         keyInput.TextSize = 14
         keyInput.TextColor3 = Sansik.Theme.InputText
@@ -336,7 +336,7 @@ function Sansik:Window(props)
         keyBtn.Position = UDim2.new(0.5, -150, 0, 150)
         keyBtn.BackgroundColor3 = Sansik.Theme.Accent
         keyBtn.BorderSizePixel = 0
-        keyBtn.Text = "Проверить"
+        keyBtn.Text = "Submit"
         keyBtn.Font = Enum.Font.GothamBold
         keyBtn.TextSize = 14
         keyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -354,7 +354,7 @@ function Sansik:Window(props)
                 end
             end
             keyInput.Text = ""
-            keyInput.PlaceholderText = "Неверный ключ!"
+            keyInput.PlaceholderText = "Invalid key!"
         end)
     end
 
