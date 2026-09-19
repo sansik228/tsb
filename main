@@ -1,5 +1,5 @@
--- Sansik UI Library v6.7
--- Fixed popup positioning (Dropdown, MultiDropdown, ColorPicker)
+-- Sansik UI Library v6.8
+-- Fixed popup position (relative to PopupLayer) + close on outside click
 
 local Sansik = {}
 Sansik.Flags = {}
@@ -606,16 +606,6 @@ function Sansik:Window(props)
     BottomRightFix.Parent = Main
     corner(BottomRightFix, 14)
 
-    -- Попапы создаются в отдельном слое на уровне ScreenGui, поверх всего
-    local PopupLayer = Instance.new("Frame")
-    PopupLayer.Name = "PopupLayer"
-    PopupLayer.Size = UDim2.new(1, 0, 1, 0)
-    PopupLayer.BackgroundTransparency = 1
-    PopupLayer.ClipsDescendants = false
-    PopupLayer.ZIndex = 9000
-    PopupLayer.Active = false
-    PopupLayer.Parent = ScreenGui
-
     local SearchOverlay = Instance.new("Frame")
     SearchOverlay.Size = UDim2.new(1, -204, 0, 50)
     SearchOverlay.Position = UDim2.new(0, 192, 0, 64)
@@ -753,6 +743,17 @@ function Sansik:Window(props)
     NotifLayout.SortOrder = Enum.SortOrder.LayoutOrder
     NotifLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
     NotifLayout.Parent = NotifFrame
+
+    -- PopupLayer: пустой слой на весь ScreenGui, НЕ перекрывающий клики
+    local PopupLayer = Instance.new("Frame")
+    PopupLayer.Name = "PopupLayer"
+    PopupLayer.Size = UDim2.new(1, 0, 1, 0)
+    PopupLayer.Position = UDim2.new(0, 0, 0, 0)
+    PopupLayer.BackgroundTransparency = 1
+    PopupLayer.ClipsDescendants = false
+    PopupLayer.ZIndex = 9000
+    PopupLayer.Active = false
+    PopupLayer.Parent = ScreenGui
 
     local Window = {}
     local currentTab = nil
@@ -1058,6 +1059,33 @@ function Sansik:Window(props)
         hideUI()
     end)
 
+    -- Клик вне попапа — закрыть все попапы этого окна
+    Services.UserInputService.InputBegan:Connect(function(input, processed)
+        if processed then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            if openDropdownList then
+                local mouse = Services.UserInputService:GetMouseLocation()
+                local listPos = openDropdownList.AbsolutePosition
+                local listSize = openDropdownList.AbsoluteSize
+                if not (mouse.X >= listPos.X and mouse.X <= listPos.X + listSize.X and
+                        mouse.Y >= listPos.Y and mouse.Y <= listPos.Y + listSize.Y) then
+                    openDropdownList.Visible = false
+                    openDropdownList = nil
+                end
+            end
+            if openColorPicker and openColorPicker.popup then
+                local popup = openColorPicker.popup
+                local mouse = Services.UserInputService:GetMouseLocation()
+                local pPos = popup.AbsolutePosition
+                local pSize = popup.AbsoluteSize
+                if not (mouse.X >= pPos.X and mouse.X <= pPos.X + pSize.X and
+                        mouse.Y >= pPos.Y and mouse.Y <= pPos.Y + pSize.Y) then
+                    if openColorPicker.close then openColorPicker.close() end
+                end
+            end
+        end
+    end)
+
     function Window:Tab(props)
         props = props or {}
         local name = props.name or "Tab"
@@ -1168,6 +1196,31 @@ function Sansik:Window(props)
             corner(frame, 10)
             stroke(frame, Sansik.Theme.ElementStroke, 1, 0.5)
             return frame
+        end
+
+        -- Хелпер: посчитать абсолютную позицию попапа внутри PopupLayer
+        local function calculatePopupPosition(elementAbs, elementSize, popupW, popupH)
+            local viewportSize = workspace.CurrentCamera.ViewportSize
+            local padding = 8
+
+            local targetX = elementAbs.X
+            local targetY = elementAbs.Y + elementSize.Y + 4
+
+            if targetX + popupW > viewportSize.X - padding then
+                targetX = viewportSize.X - popupW - padding
+            end
+            if targetX < padding then targetX = padding end
+
+            if targetY + popupH > viewportSize.Y - padding then
+                local topY = elementAbs.Y - popupH - 4
+                if topY >= padding then
+                    targetY = topY
+                else
+                    targetY = viewportSize.Y - popupH - padding
+                end
+            end
+
+            return targetX, targetY
         end
 
         function Tab:Button(props)
@@ -1450,7 +1503,6 @@ function Sansik:Window(props)
                 end
             end)
 
-            -- Попап создаётся в PopupLayer (отдельно от Content), позиция через AbsolutePosition
             local list = Instance.new("Frame")
             list.Name = "DropdownPopup"
             list.Size = UDim2.new(0, 0, 0, 0)
@@ -1534,43 +1586,11 @@ function Sansik:Window(props)
             local function closeList()
                 dropdown:SetAttribute("Open", false)
                 arrow.Rotation = 0
-                tween(list, 0.2, {Size = UDim2.new(list.Size.X.Scale, list.Size.X.Offset, 0, 0), BackgroundTransparency = 1}):Play()
-                task.wait(0.2)
+                tween(list, 0.15, {Size = UDim2.new(list.Size.X.Scale, list.Size.X.Offset, 0, 0), BackgroundTransparency = 1}):Play()
+                task.wait(0.15)
                 list.Visible = false
                 if openDropdownList == list then openDropdownList = nil end
                 tween(dropdown, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackground}):Play()
-            end
-
-            local function updateListPosition()
-                -- Абсолютные координаты на экране
-                local dropdownAbs = dropdown.AbsolutePosition
-                local dropdownSize = dropdown.AbsoluteSize
-                local padding = 8
-
-                -- X всегда как у dropdown (можно сдвинуть, если вылезет справа)
-                local targetX = dropdownAbs.X
-                local targetY = dropdownAbs.Y + dropdownSize.Y + 4
-
-                -- Ограничение по правому краю экрана
-                local viewportSize = workspace.CurrentCamera.ViewportSize
-                if targetX + dropdownSize.X > viewportSize.X - padding then
-                    targetX = viewportSize.X - dropdownSize.X - padding
-                end
-                if targetX < padding then targetX = padding end
-
-                -- Ограничение по нижнему краю экрана
-                local listH = computeListHeight()
-                if targetY + listH > viewportSize.Y - padding then
-                    local topY = dropdownAbs.Y - listH - 4
-                    if topY >= padding then
-                        targetY = topY
-                    else
-                        targetY = viewportSize.Y - listH - padding
-                    end
-                end
-
-                list.Position = UDim2.new(0, targetX, 0, targetY)
-                list.Size = UDim2.new(0, dropdownSize.X, 0, list.Size.Y.Offset)
             end
 
             local function createOption(optionName)
@@ -1702,43 +1722,23 @@ function Sansik:Window(props)
                     list.Visible = true
                     list.BackgroundTransparency = 1
 
-                    -- Мгновенно ставим правильную позицию и размер
                     local dropdownAbs = dropdown.AbsolutePosition
                     local dropdownSize = dropdown.AbsoluteSize
-                    local padding = 8
                     local finalH = computeListHeight()
 
-                    local targetX = dropdownAbs.X
-                    local targetY = dropdownAbs.Y + dropdownSize.Y + 4
-
-                    local viewportSize = workspace.CurrentCamera.ViewportSize
-                    if targetX + dropdownSize.X > viewportSize.X - padding then
-                        targetX = viewportSize.X - dropdownSize.X - padding
-                    end
-                    if targetX < padding then targetX = padding end
-
-                    if targetY + finalH > viewportSize.Y - padding then
-                        local topY = dropdownAbs.Y - finalH - 4
-                        if topY >= padding then
-                            targetY = topY
-                        else
-                            targetY = viewportSize.Y - finalH - padding
-                        end
-                    end
+                    -- Позиция относительно PopupLayer
+                    local targetX, targetY = calculatePopupPosition(dropdownAbs, dropdownSize, dropdownSize.X, finalH)
 
                     list.Position = UDim2.new(0, targetX, 0, targetY)
                     list.Size = UDim2.new(0, dropdownSize.X, 0, 0)
 
                     openDropdownList = list
-                    tween(list, 0.25, {Size = UDim2.new(0, dropdownSize.X, 0, finalH), BackgroundTransparency = 0}):Play()
+                    tween(list, 0.2, {Size = UDim2.new(0, dropdownSize.X, 0, finalH), BackgroundTransparency = 0}):Play()
                 end
             end)
 
-            -- При скролле — закрываем попап, чтобы не уезжал
             Content:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
-                if list.Visible then
-                    closeList()
-                end
+                if list.Visible then closeList() end
             end)
 
             Page:GetPropertyChangedSignal("Visible"):Connect(function()
@@ -1923,8 +1923,8 @@ function Sansik:Window(props)
             local function closeList()
                 dropdown:SetAttribute("Open", false)
                 arrow.Rotation = 0
-                tween(list, 0.2, {Size = UDim2.new(list.Size.X.Scale, list.Size.X.Offset, 0, 0), BackgroundTransparency = 1}):Play()
-                task.wait(0.2)
+                tween(list, 0.15, {Size = UDim2.new(list.Size.X.Scale, list.Size.X.Offset, 0, 0), BackgroundTransparency = 1}):Play()
+                task.wait(0.15)
                 list.Visible = false
                 if openDropdownList == list then openDropdownList = nil end
                 tween(dropdown, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackground}):Play()
@@ -2084,32 +2084,15 @@ function Sansik:Window(props)
 
                     local dropdownAbs = dropdown.AbsolutePosition
                     local dropdownSize = dropdown.AbsoluteSize
-                    local padding = 8
                     local finalH = computeListHeight()
 
-                    local targetX = dropdownAbs.X
-                    local targetY = dropdownAbs.Y + dropdownSize.Y + 4
-
-                    local viewportSize = workspace.CurrentCamera.ViewportSize
-                    if targetX + dropdownSize.X > viewportSize.X - padding then
-                        targetX = viewportSize.X - dropdownSize.X - padding
-                    end
-                    if targetX < padding then targetX = padding end
-
-                    if targetY + finalH > viewportSize.Y - padding then
-                        local topY = dropdownAbs.Y - finalH - 4
-                        if topY >= padding then
-                            targetY = topY
-                        else
-                            targetY = viewportSize.Y - finalH - padding
-                        end
-                    end
+                    local targetX, targetY = calculatePopupPosition(dropdownAbs, dropdownSize, dropdownSize.X, finalH)
 
                     list.Position = UDim2.new(0, targetX, 0, targetY)
                     list.Size = UDim2.new(0, dropdownSize.X, 0, 0)
 
                     openDropdownList = list
-                    tween(list, 0.25, {Size = UDim2.new(0, dropdownSize.X, 0, finalH), BackgroundTransparency = 0}):Play()
+                    tween(list, 0.2, {Size = UDim2.new(0, dropdownSize.X, 0, finalH), BackgroundTransparency = 0}):Play()
                 end
             end)
 
@@ -2590,29 +2573,11 @@ function Sansik:Window(props)
                     if openColorPicker and openColorPicker.close then openColorPicker.close() end
                     if openDropdownList then openDropdownList.Visible = false openDropdownList = nil end
 
-                    -- Позиция: под элементом, через AbsolutePosition
                     local cpAbs = cp.AbsolutePosition
                     local cpSize = cp.AbsoluteSize
                     local popupW, popupH = 320, 200
-                    local padding = 8
-                    local viewportSize = workspace.CurrentCamera.ViewportSize
 
-                    local targetX = cpAbs.X
-                    local targetY = cpAbs.Y + cpSize.Y + 4
-
-                    if targetX + popupW > viewportSize.X - padding then
-                        targetX = viewportSize.X - popupW - padding
-                    end
-                    if targetX < padding then targetX = padding end
-
-                    if targetY + popupH > viewportSize.Y - padding then
-                        local topY = cpAbs.Y - popupH - 4
-                        if topY >= padding then
-                            targetY = topY
-                        else
-                            targetY = viewportSize.Y - popupH - padding
-                        end
-                    end
+                    local targetX, targetY = calculatePopupPosition(cpAbs, cpSize, popupW, popupH)
 
                     popup.Position = UDim2.new(0, targetX, 0, targetY)
                     popup.Visible = true
