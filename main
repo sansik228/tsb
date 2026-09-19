@@ -1,5 +1,5 @@
--- Sansik UI Library v6.2
--- Fixed hide/show without breaking layout
+-- Sansik UI Library v6.3
+-- Scale + Fade animation (Rayfield style)
 
 local Sansik = {}
 Sansik.Flags = {}
@@ -327,6 +327,11 @@ function Sansik:Window(props)
     corner(Main, 14)
     stroke(Main, Sansik.Theme.ElementStroke, 1, 0.6)
 
+    -- UIScale для анимации
+    local MainScale = Instance.new("UIScale")
+    MainScale.Scale = 1
+    MainScale.Parent = Main
+
     local Shadow = Instance.new("ImageLabel")
     Shadow.Size = UDim2.new(1, 40, 1, 40)
     Shadow.Position = UDim2.new(0, -20, 0, -20)
@@ -613,6 +618,10 @@ function Sansik:Window(props)
     corner(FloatingBtn, 25)
     stroke(FloatingBtn, Sansik.Theme.ElementStroke, 1, 0.4)
 
+    local FloatingScale = Instance.new("UIScale")
+    FloatingScale.Scale = 1
+    FloatingScale.Parent = FloatingBtn
+
     local FloatingIcon = Instance.new("ImageLabel")
     FloatingIcon.Size = UDim2.new(0, 28, 0, 28)
     FloatingIcon.Position = UDim2.new(0, 16, 0.5, -14)
@@ -855,7 +864,7 @@ function Sansik:Window(props)
         if SearchInput.Text == "" then closeSearch() end
     end)
 
-    -- HIDE / SHOW (простой, без анимации размеров)
+    -- ============ АНИМАЦИЯ SCALE + FADE ============
     local function hideUI()
         if isHidden or isAnimating then return end
         isHidden = true
@@ -865,9 +874,60 @@ function Sansik:Window(props)
         if openColorPicker and openColorPicker.close then openColorPicker.close() end
         closeSearch()
 
-        Main.Visible = false
-        FloatingBtn.Visible = true
+        -- Получаем позицию floating-кнопки относительно Main
+        local floatingAbs = FloatingBtn.AbsolutePosition
+        local floatingSize = FloatingBtn.AbsoluteSize
+        local mainAbs = Main.AbsolutePosition
+        local mainSize = Main.AbsoluteSize
 
+        -- Центр floating-кнопки относительно Main (в пикселях)
+        local floatCenterX = floatingAbs.X + floatingSize.X / 2 - mainAbs.X
+        local floatCenterY = floatingAbs.Y + floatingSize.Y / 2 - mainAbs.Y
+
+        -- Пересчитываем AnchorPoint, чтобы UIScale сжимал Main в точку кнопки
+        local anchorX = floatCenterX / mainSize.X
+        local anchorY = floatCenterY / mainSize.Y
+
+        -- Показываем Floating сразу (прозрачным)
+        FloatingBtn.Visible = true
+        FloatingBtn.BackgroundTransparency = 1
+        FloatingIcon.ImageTransparency = 1
+        FloatingTitle.TextTransparency = 1
+        FloatingSub.TextTransparency = 1
+        FloatingScale.Scale = 0.3
+
+        -- Меняем AnchorPoint, чтобы центр масштабирования был в точке кнопки
+        Main.AnchorPoint = Vector2.new(anchorX, anchorY)
+
+        -- Анимация: Scale в 0.1 + прозрачность
+        tween(MainScale, 0.35, {Scale = 0.1}):Play()
+        tween(Main, 0.35, {BackgroundTransparency = 1}):Play()
+
+        -- Скрываем содержимое через прозрачность
+        for _, desc in ipairs(Main:GetDescendants()) do
+            if desc:IsA("Frame") then
+                tween(desc, 0.3, {BackgroundTransparency = 1}):Play()
+            elseif desc:IsA("TextLabel") or desc:IsA("TextBox") then
+                tween(desc, 0.3, {TextTransparency = 1}):Play()
+            elseif desc:IsA("ImageLabel") or desc:IsA("ImageButton") then
+                tween(desc, 0.3, {ImageTransparency = 1}):Play()
+            elseif desc:IsA("UIStroke") then
+                tween(desc, 0.3, {Transparency = 1}):Play()
+            end
+        end
+
+        -- Ждём завершения
+        task.wait(0.35)
+        Main.Visible = false
+
+        -- Анимация Floating
+        tween(FloatingScale, 0.3, {Scale = 1}, Enum.EasingStyle.Back, Enum.EasingDirection.Out):Play()
+        tween(FloatingBtn, 0.25, {BackgroundTransparency = 0}):Play()
+        tween(FloatingIcon, 0.25, {ImageTransparency = 0}):Play()
+        tween(FloatingTitle, 0.25, {TextTransparency = 0}):Play()
+        tween(FloatingSub, 0.25, {TextTransparency = 0}):Play()
+
+        task.wait(0.3)
         isAnimating = false
     end
 
@@ -876,21 +936,59 @@ function Sansik:Window(props)
         isHidden = false
         isAnimating = true
 
+        -- Скрываем Floating с анимацией
+        tween(FloatingScale, 0.2, {Scale = 0.3}):Play()
+        tween(FloatingBtn, 0.2, {BackgroundTransparency = 1}):Play()
+        tween(FloatingIcon, 0.2, {ImageTransparency = 1}):Play()
+        tween(FloatingTitle, 0.2, {TextTransparency = 1}):Play()
+        tween(FloatingSub, 0.2, {TextTransparency = 1}):Play()
+
+        task.wait(0.2)
         FloatingBtn.Visible = false
 
-        -- Сброс Main в исходное состояние
-        Main.Size = UDim2.new(0, 600, 0, 400)
-        Main.Position = UDim2.new(0.5, 0, 0.5, 0)
-        Main.BackgroundTransparency = 0
-        Topbar.BackgroundTransparency = 0
-        TopbarBottomFix.BackgroundTransparency = 0
-        TopbarDivider.BackgroundTransparency = 0.5
-        Title.TextTransparency = 0
-        Subtitle.TextTransparency = 0
-        Sidebar.BackgroundTransparency = 0
-
+        -- Восстанавливаем Main
         Main.Visible = true
+        Main.AnchorPoint = Vector2.new(0.5, 0.5)
+        Main.Position = UDim2.new(0.5, 0, 0.5, 0)
+        Main.Size = UDim2.new(0, 600, 0, 400)
+        MainScale.Scale = 0.1
 
+        -- Сброс прозрачностей содержимого
+        for _, desc in ipairs(Main:GetDescendants()) do
+            if desc:IsA("Frame") and desc ~= Main then
+                if desc.Name == "BottomFix" or desc.Name == "CornerFix" or desc.Name == "TopRightFix" or desc.Name == "TopFix" then
+                    desc.BackgroundTransparency = 0
+                elseif desc.Name == "Divider" or desc.Name == "SidebarDivider" or desc.Name == "TopbarDivider" then
+                    desc.BackgroundTransparency = 0.5
+                elseif desc.Name == "BottomLeftFix" or desc.Name == "BottomRightFix" or desc.Name == "Profile" or desc.Name == "ProfileTopFix" then
+                    desc.BackgroundTransparency = 0
+                else
+                    desc.BackgroundTransparency = 0
+                end
+            elseif desc:IsA("TextLabel") or desc:IsA("TextBox") then
+                if desc.Name == "Subtitle" or desc.Name == "PlayerName" or desc.Name == "Search" then
+                    desc.TextTransparency = 0
+                elseif desc.Name == "Description" or desc.Name == "desc" then
+                    desc.TextTransparency = 0.2
+                else
+                    desc.TextTransparency = 0
+                end
+            elseif desc:IsA("ImageLabel") or desc:IsA("ImageButton") then
+                if desc.Name == "Shadow" then
+                    desc.ImageTransparency = 0.5
+                else
+                    desc.ImageTransparency = 0
+                end
+            elseif desc:IsA("UIStroke") then
+                desc.Transparency = 0.6
+            end
+        end
+
+        -- Анимация Scale
+        tween(MainScale, 0.4, {Scale = 1}, Enum.EasingStyle.Back, Enum.EasingDirection.Out):Play()
+        tween(Main, 0.3, {BackgroundTransparency = 0}):Play()
+
+        task.wait(0.4)
         isAnimating = false
     end
 
@@ -900,8 +998,9 @@ function Sansik:Window(props)
     end)
 
     FloatingBtn.MouseEnter:Connect(function()
-        if not isHidden then return end
-        tween(FloatingBtn, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackground}):Play()
+        if isHidden then
+            tween(FloatingBtn, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackground}):Play()
+        end
     end)
     FloatingBtn.MouseLeave:Connect(function()
         tween(FloatingBtn, 0.15, {BackgroundColor3 = Sansik.Theme.Background}):Play()
