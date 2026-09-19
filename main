@@ -1,5 +1,5 @@
--- Sansik UI Library v5.25
--- Fixed ColorPicker close button (ImageButton)
+-- Sansik UI Library v5.3
+-- Fixed ColorPicker popup position + Content clipping
 
 local Sansik = {}
 Sansik.Flags = {}
@@ -1015,7 +1015,24 @@ function Sansik:Window(props)
             local function updateListPosition()
                 local dropdownAbs = dropdown.AbsolutePosition
                 local mainAbs = Main.AbsolutePosition
-                list.Position = UDim2.new(0, dropdownAbs.X - mainAbs.X, 0, dropdownAbs.Y - mainAbs.Y + dropdown.AbsoluteSize.Y + 4)
+                local mainSize = Main.AbsoluteSize
+                local listH = 200
+                local padding = 10
+
+                local relX = dropdownAbs.X - mainAbs.X
+                local relY = dropdownAbs.Y - mainAbs.Y + dropdown.AbsoluteSize.Y + 4
+
+                if relX + dropdown.AbsoluteSize.X > mainSize.X - padding then
+                    relX = mainSize.X - dropdown.AbsoluteSize.X - padding
+                end
+                if relX < padding then relX = padding end
+
+                if relY + listH > mainSize.Y - padding then
+                    relY = dropdownAbs.Y - mainAbs.Y - listH - 4
+                end
+                if relY < padding then relY = padding end
+
+                list.Position = UDim2.new(0, relX, 0, relY)
                 list.Size = UDim2.new(0, dropdown.AbsoluteSize.X, 0, 0)
             end
 
@@ -1471,10 +1488,31 @@ function Sansik:Window(props)
                 local cpAbs = cp.AbsolutePosition
                 local mainAbs = Main.AbsolutePosition
                 local mainSize = Main.AbsoluteSize
+
+                local popupW, popupH = 320, 200
+                local padding = 10
+
                 local relX = cpAbs.X - mainAbs.X
                 local relY = cpAbs.Y - mainAbs.Y + cp.AbsoluteSize.Y + 4
-                if relX + 320 > mainSize.X - 10 then relX = math.max(10, mainSize.X - 330) end
-                if relY + 200 > mainSize.Y - 10 then relY = cpAbs.Y - mainAbs.Y - 200 - 4 end
+
+                -- Проверка справа
+                if relX + popupW > mainSize.X - padding then
+                    relX = mainSize.X - popupW - padding
+                end
+                -- Проверка слева
+                if relX < padding then
+                    relX = padding
+                end
+
+                -- Проверка снизу: если не влезает — открываем сверху
+                if relY + popupH > mainSize.Y - padding then
+                    relY = cpAbs.Y - mainAbs.Y - popupH - 4
+                end
+                -- Проверка сверху: если тоже не влезает (ColorPicker в самом верху)
+                if relY < padding then
+                    relY = padding
+                end
+
                 popup.Position = UDim2.new(0, relX, 0, relY)
             end
 
@@ -1597,7 +1635,6 @@ function Sansik:Window(props)
             alphaBox.Parent = popup
             corner(alphaBox, 6)
 
-            -- Close (ИСПОЛЬЗУЕМ ИКОНКУ X)
             local popupClose = Instance.new("ImageButton")
             popupClose.Size = UDim2.new(0, 24, 0, 24)
             popupClose.Position = UDim2.new(1, -30, 0, 6)
