@@ -1,4 +1,4 @@
--- Sansik UI Library v5.2
+-- Sansik UI Library v5.25
 -- Fixed ColorPicker close button (ImageButton)
 
 local Sansik = {}
@@ -413,7 +413,7 @@ function Sansik:Window(props)
     Content.ScrollBarImageColor3 = Sansik.Theme.ElementStroke
     Content.CanvasSize = UDim2.new(0, 0, 0, 0)
     Content.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    Content.ClipsDescendants = false
+    Content.ClipsDescendants = true
     Content.Parent = Main
 
     local BottomLeftFix = Instance.new("Frame")
