@@ -1,9 +1,10 @@
--- Sansik UI Library v6.6
--- Multi-window support, fixed popup positions
+-- Sansik UI Library v6.7
+-- Fixed popup positioning (Dropdown, MultiDropdown, ColorPicker)
 
 local Sansik = {}
 Sansik.Flags = {}
 Sansik.ActiveWindow = nil
+Sansik.Windows = {}
 Sansik.Theme = {
     TextColor = Color3.fromRGB(240, 240, 245),
     TextSecondary = Color3.fromRGB(140, 140, 150),
@@ -276,9 +277,6 @@ local function fadeRoot(root, target, duration)
         end
     end
 end
-
--- Активные окна (для Варианта В — K переключает только активное)
-Sansik.Windows = {}
 
 function Sansik:Window(props)
     props = props or {}
@@ -608,21 +606,15 @@ function Sansik:Window(props)
     BottomRightFix.Parent = Main
     corner(BottomRightFix, 14)
 
-    local DropdownLayer = Instance.new("Frame")
-    DropdownLayer.Size = UDim2.new(1, 0, 1, 0)
-    DropdownLayer.BackgroundTransparency = 1
-    DropdownLayer.ClipsDescendants = false
-    DropdownLayer.ZIndex = 500
-    DropdownLayer.Active = false
-    DropdownLayer.Parent = Main
-
-    local ColorPickerLayer = Instance.new("Frame")
-    ColorPickerLayer.Size = UDim2.new(1, 0, 1, 0)
-    ColorPickerLayer.BackgroundTransparency = 1
-    ColorPickerLayer.ClipsDescendants = false
-    ColorPickerLayer.ZIndex = 600
-    ColorPickerLayer.Active = false
-    ColorPickerLayer.Parent = Main
+    -- Попапы создаются в отдельном слое на уровне ScreenGui, поверх всего
+    local PopupLayer = Instance.new("Frame")
+    PopupLayer.Name = "PopupLayer"
+    PopupLayer.Size = UDim2.new(1, 0, 1, 0)
+    PopupLayer.BackgroundTransparency = 1
+    PopupLayer.ClipsDescendants = false
+    PopupLayer.ZIndex = 9000
+    PopupLayer.Active = false
+    PopupLayer.Parent = ScreenGui
 
     local SearchOverlay = Instance.new("Frame")
     SearchOverlay.Size = UDim2.new(1, -204, 0, 50)
@@ -769,7 +761,6 @@ function Sansik:Window(props)
     local isHidden = false
     local isAnimating = false
 
-    -- Регистрируем окно в списке
     table.insert(Sansik.Windows, {window = Window, main = Main, floating = FloatingBtn})
 
     function Window:Notify(props)
@@ -1459,14 +1450,16 @@ function Sansik:Window(props)
                 end
             end)
 
+            -- Попап создаётся в PopupLayer (отдельно от Content), позиция через AbsolutePosition
             local list = Instance.new("Frame")
+            list.Name = "DropdownPopup"
             list.Size = UDim2.new(0, 0, 0, 0)
             list.BackgroundColor3 = Sansik.Theme.DropdownBackground
             list.BorderSizePixel = 0
             list.Visible = false
             list.ClipsDescendants = true
-            list.ZIndex = 501
-            list.Parent = DropdownLayer
+            list.ZIndex = 1
+            list.Parent = PopupLayer
             corner(list, 10)
             stroke(list, Sansik.Theme.ElementStroke, 1, 0.5)
 
@@ -1475,7 +1468,7 @@ function Sansik:Window(props)
             searchContainer.Position = UDim2.new(0, 8, 0, 8)
             searchContainer.BackgroundColor3 = Sansik.Theme.DropdownOption
             searchContainer.BorderSizePixel = 0
-            searchContainer.ZIndex = 502
+            searchContainer.ZIndex = 2
             searchContainer.Parent = list
             corner(searchContainer, 6)
 
@@ -1484,7 +1477,7 @@ function Sansik:Window(props)
             searchIcon.Position = UDim2.new(0, 10, 0.5, -7)
             searchIcon.BackgroundTransparency = 1
             searchIcon.ImageColor3 = Sansik.Theme.TextSecondary
-            searchIcon.ZIndex = 503
+            searchIcon.ZIndex = 3
             searchIcon.Parent = searchContainer
             local searchIco2 = getIcon("search")
             if searchIco2 then
@@ -1505,7 +1498,7 @@ function Sansik:Window(props)
             searchBox.PlaceholderColor3 = Sansik.Theme.TextSecondary
             searchBox.TextXAlignment = Enum.TextXAlignment.Left
             searchBox.ClearTextOnFocus = false
-            searchBox.ZIndex = 503
+            searchBox.ZIndex = 3
             searchBox.Parent = searchContainer
 
             local optionsScroll = Instance.new("ScrollingFrame")
@@ -1517,7 +1510,7 @@ function Sansik:Window(props)
             optionsScroll.ScrollBarImageColor3 = Sansik.Theme.ElementStroke
             optionsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
             optionsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-            optionsScroll.ZIndex = 502
+            optionsScroll.ZIndex = 2
             optionsScroll.Parent = list
 
             local optionsLayout = Instance.new("UIListLayout")
@@ -1541,7 +1534,7 @@ function Sansik:Window(props)
             local function closeList()
                 dropdown:SetAttribute("Open", false)
                 arrow.Rotation = 0
-                tween(list, 0.2, {Size = UDim2.new(0, dropdown.AbsoluteSize.X, 0, 0), BackgroundTransparency = 1}):Play()
+                tween(list, 0.2, {Size = UDim2.new(list.Size.X.Scale, list.Size.X.Offset, 0, 0), BackgroundTransparency = 1}):Play()
                 task.wait(0.2)
                 list.Visible = false
                 if openDropdownList == list then openDropdownList = nil end
@@ -1549,33 +1542,35 @@ function Sansik:Window(props)
             end
 
             local function updateListPosition()
+                -- Абсолютные координаты на экране
                 local dropdownAbs = dropdown.AbsolutePosition
-                local mainAbs = Main.AbsolutePosition
-                local mainSize = Main.AbsoluteSize
-                local padding = 10
-                local listH = computeListHeight()
+                local dropdownSize = dropdown.AbsoluteSize
+                local padding = 8
 
-                local relX = dropdownAbs.X - mainAbs.X
-                local relY = dropdownAbs.Y - mainAbs.Y + dropdown.AbsoluteSize.Y + 4
+                -- X всегда как у dropdown (можно сдвинуть, если вылезет справа)
+                local targetX = dropdownAbs.X
+                local targetY = dropdownAbs.Y + dropdownSize.Y + 4
 
-                if relX + dropdown.AbsoluteSize.X > mainSize.X - padding then
-                    relX = mainSize.X - dropdown.AbsoluteSize.X - padding
+                -- Ограничение по правому краю экрана
+                local viewportSize = workspace.CurrentCamera.ViewportSize
+                if targetX + dropdownSize.X > viewportSize.X - padding then
+                    targetX = viewportSize.X - dropdownSize.X - padding
                 end
-                if relX < padding then relX = padding end
+                if targetX < padding then targetX = padding end
 
-                -- Открываем снизу, только если не влезает — сверху
-                if relY + listH > mainSize.Y - padding then
-                    local topY = dropdownAbs.Y - mainAbs.Y - listH - 4
+                -- Ограничение по нижнему краю экрана
+                local listH = computeListHeight()
+                if targetY + listH > viewportSize.Y - padding then
+                    local topY = dropdownAbs.Y - listH - 4
                     if topY >= padding then
-                        relY = topY
+                        targetY = topY
                     else
-                        relY = mainSize.Y - listH - padding
+                        targetY = viewportSize.Y - listH - padding
                     end
                 end
-                if relY < padding then relY = padding end
 
-                list.Position = UDim2.new(0, relX, 0, relY)
-                list.Size = UDim2.new(0, dropdown.AbsoluteSize.X, 0, 0)
+                list.Position = UDim2.new(0, targetX, 0, targetY)
+                list.Size = UDim2.new(0, dropdownSize.X, 0, list.Size.Y.Offset)
             end
 
             local function createOption(optionName)
@@ -1586,7 +1581,7 @@ function Sansik:Window(props)
                 optionBtn.BorderSizePixel = 0
                 optionBtn.Text = ""
                 optionBtn.AutoButtonColor = false
-                optionBtn.ZIndex = 503
+                optionBtn.ZIndex = 3
                 optionBtn.Parent = optionsScroll
                 corner(optionBtn, 6)
 
@@ -1595,7 +1590,7 @@ function Sansik:Window(props)
                 optIcon.Position = UDim2.new(0, 12, 0.5, -8)
                 optIcon.BackgroundTransparency = 1
                 optIcon.ImageColor3 = Sansik.Theme.TextSecondary
-                optIcon.ZIndex = 504
+                optIcon.ZIndex = 4
                 optIcon.Parent = optionBtn
 
                 local optLabel = Instance.new("TextLabel")
@@ -1607,7 +1602,7 @@ function Sansik:Window(props)
                 optLabel.TextXAlignment = Enum.TextXAlignment.Left
                 optLabel.Position = UDim2.new(0, 38, 0, 0)
                 optLabel.Size = UDim2.new(1, -50, 1, 0)
-                optLabel.ZIndex = 504
+                optLabel.ZIndex = 4
                 optLabel.Parent = optionBtn
 
                 local function setState(isSelected)
@@ -1700,22 +1695,54 @@ function Sansik:Window(props)
                 else
                     if openDropdownList and openDropdownList ~= list then
                         openDropdownList.Visible = false
-                        openDropdownList.Size = UDim2.new(0, 0, 0, 0)
                     end
                     if openColorPicker and openColorPicker.close then openColorPicker.close() end
                     dropdown:SetAttribute("Open", true)
                     arrow.Rotation = 180
-                    updateListPosition()
                     list.Visible = true
                     list.BackgroundTransparency = 1
-                    openDropdownList = list
+
+                    -- Мгновенно ставим правильную позицию и размер
+                    local dropdownAbs = dropdown.AbsolutePosition
+                    local dropdownSize = dropdown.AbsoluteSize
+                    local padding = 8
                     local finalH = computeListHeight()
-                    tween(list, 0.25, {Size = UDim2.new(0, dropdown.AbsoluteSize.X, 0, finalH), BackgroundTransparency = 0}):Play()
+
+                    local targetX = dropdownAbs.X
+                    local targetY = dropdownAbs.Y + dropdownSize.Y + 4
+
+                    local viewportSize = workspace.CurrentCamera.ViewportSize
+                    if targetX + dropdownSize.X > viewportSize.X - padding then
+                        targetX = viewportSize.X - dropdownSize.X - padding
+                    end
+                    if targetX < padding then targetX = padding end
+
+                    if targetY + finalH > viewportSize.Y - padding then
+                        local topY = dropdownAbs.Y - finalH - 4
+                        if topY >= padding then
+                            targetY = topY
+                        else
+                            targetY = viewportSize.Y - finalH - padding
+                        end
+                    end
+
+                    list.Position = UDim2.new(0, targetX, 0, targetY)
+                    list.Size = UDim2.new(0, dropdownSize.X, 0, 0)
+
+                    openDropdownList = list
+                    tween(list, 0.25, {Size = UDim2.new(0, dropdownSize.X, 0, finalH), BackgroundTransparency = 0}):Play()
+                end
+            end)
+
+            -- При скролле — закрываем попап, чтобы не уезжал
+            Content:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+                if list.Visible then
+                    closeList()
                 end
             end)
 
             Page:GetPropertyChangedSignal("Visible"):Connect(function()
-                if not Page.Visible and list.Visible then list.Visible = false end
+                if not Page.Visible and list.Visible then closeList() end
             end)
 
             if props.flag then Sansik.Flags[props.flag] = currentValue end
@@ -1815,13 +1842,14 @@ function Sansik:Window(props)
             end)
 
             local list = Instance.new("Frame")
+            list.Name = "MultiDropdownPopup"
             list.Size = UDim2.new(0, 0, 0, 0)
             list.BackgroundColor3 = Sansik.Theme.DropdownBackground
             list.BorderSizePixel = 0
             list.Visible = false
             list.ClipsDescendants = true
-            list.ZIndex = 501
-            list.Parent = DropdownLayer
+            list.ZIndex = 1
+            list.Parent = PopupLayer
             corner(list, 10)
             stroke(list, Sansik.Theme.ElementStroke, 1, 0.5)
 
@@ -1830,7 +1858,7 @@ function Sansik:Window(props)
             searchContainer.Position = UDim2.new(0, 8, 0, 8)
             searchContainer.BackgroundColor3 = Sansik.Theme.DropdownOption
             searchContainer.BorderSizePixel = 0
-            searchContainer.ZIndex = 502
+            searchContainer.ZIndex = 2
             searchContainer.Parent = list
             corner(searchContainer, 6)
 
@@ -1846,7 +1874,7 @@ function Sansik:Window(props)
             searchBox.PlaceholderColor3 = Sansik.Theme.TextSecondary
             searchBox.TextXAlignment = Enum.TextXAlignment.Left
             searchBox.ClearTextOnFocus = false
-            searchBox.ZIndex = 503
+            searchBox.ZIndex = 3
             searchBox.Parent = searchContainer
 
             local optionsScroll = Instance.new("ScrollingFrame")
@@ -1858,7 +1886,7 @@ function Sansik:Window(props)
             optionsScroll.ScrollBarImageColor3 = Sansik.Theme.ElementStroke
             optionsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
             optionsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-            optionsScroll.ZIndex = 502
+            optionsScroll.ZIndex = 2
             optionsScroll.Parent = list
 
             local optionsLayout = Instance.new("UIListLayout")
@@ -1895,40 +1923,11 @@ function Sansik:Window(props)
             local function closeList()
                 dropdown:SetAttribute("Open", false)
                 arrow.Rotation = 0
-                tween(list, 0.2, {Size = UDim2.new(0, dropdown.AbsoluteSize.X, 0, 0), BackgroundTransparency = 1}):Play()
+                tween(list, 0.2, {Size = UDim2.new(list.Size.X.Scale, list.Size.X.Offset, 0, 0), BackgroundTransparency = 1}):Play()
                 task.wait(0.2)
                 list.Visible = false
                 if openDropdownList == list then openDropdownList = nil end
                 tween(dropdown, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackground}):Play()
-            end
-
-            local function updateListPosition()
-                local dropdownAbs = dropdown.AbsolutePosition
-                local mainAbs = Main.AbsolutePosition
-                local mainSize = Main.AbsoluteSize
-                local padding = 10
-                local listH = computeListHeight()
-
-                local relX = dropdownAbs.X - mainAbs.X
-                local relY = dropdownAbs.Y - mainAbs.Y + dropdown.AbsoluteSize.Y + 4
-
-                if relX + dropdown.AbsoluteSize.X > mainSize.X - padding then
-                    relX = mainSize.X - dropdown.AbsoluteSize.X - padding
-                end
-                if relX < padding then relX = padding end
-
-                if relY + listH > mainSize.Y - padding then
-                    local topY = dropdownAbs.Y - mainAbs.Y - listH - 4
-                    if topY >= padding then
-                        relY = topY
-                    else
-                        relY = mainSize.Y - listH - padding
-                    end
-                end
-                if relY < padding then relY = padding end
-
-                list.Position = UDim2.new(0, relX, 0, relY)
-                list.Size = UDim2.new(0, dropdown.AbsoluteSize.X, 0, 0)
             end
 
             local function isSelected(optionName)
@@ -1946,7 +1945,7 @@ function Sansik:Window(props)
                 optionBtn.BorderSizePixel = 0
                 optionBtn.Text = ""
                 optionBtn.AutoButtonColor = false
-                optionBtn.ZIndex = 503
+                optionBtn.ZIndex = 3
                 optionBtn.Parent = optionsScroll
                 corner(optionBtn, 6)
 
@@ -1955,7 +1954,7 @@ function Sansik:Window(props)
                 optIcon.Position = UDim2.new(0, 12, 0.5, -8)
                 optIcon.BackgroundTransparency = 1
                 optIcon.ImageColor3 = Sansik.Theme.TextSecondary
-                optIcon.ZIndex = 504
+                optIcon.ZIndex = 4
                 optIcon.Parent = optionBtn
 
                 local optLabel = Instance.new("TextLabel")
@@ -1967,7 +1966,7 @@ function Sansik:Window(props)
                 optLabel.TextXAlignment = Enum.TextXAlignment.Left
                 optLabel.Position = UDim2.new(0, 38, 0, 0)
                 optLabel.Size = UDim2.new(1, -50, 1, 0)
-                optLabel.ZIndex = 504
+                optLabel.ZIndex = 4
                 optLabel.Parent = optionBtn
 
                 local function setState(isSel)
@@ -2076,22 +2075,50 @@ function Sansik:Window(props)
                 else
                     if openDropdownList and openDropdownList ~= list then
                         openDropdownList.Visible = false
-                        openDropdownList.Size = UDim2.new(0, 0, 0, 0)
                     end
                     if openColorPicker and openColorPicker.close then openColorPicker.close() end
                     dropdown:SetAttribute("Open", true)
                     arrow.Rotation = 180
-                    updateListPosition()
                     list.Visible = true
                     list.BackgroundTransparency = 1
-                    openDropdownList = list
+
+                    local dropdownAbs = dropdown.AbsolutePosition
+                    local dropdownSize = dropdown.AbsoluteSize
+                    local padding = 8
                     local finalH = computeListHeight()
-                    tween(list, 0.25, {Size = UDim2.new(0, dropdown.AbsoluteSize.X, 0, finalH), BackgroundTransparency = 0}):Play()
+
+                    local targetX = dropdownAbs.X
+                    local targetY = dropdownAbs.Y + dropdownSize.Y + 4
+
+                    local viewportSize = workspace.CurrentCamera.ViewportSize
+                    if targetX + dropdownSize.X > viewportSize.X - padding then
+                        targetX = viewportSize.X - dropdownSize.X - padding
+                    end
+                    if targetX < padding then targetX = padding end
+
+                    if targetY + finalH > viewportSize.Y - padding then
+                        local topY = dropdownAbs.Y - finalH - 4
+                        if topY >= padding then
+                            targetY = topY
+                        else
+                            targetY = viewportSize.Y - finalH - padding
+                        end
+                    end
+
+                    list.Position = UDim2.new(0, targetX, 0, targetY)
+                    list.Size = UDim2.new(0, dropdownSize.X, 0, 0)
+
+                    openDropdownList = list
+                    tween(list, 0.25, {Size = UDim2.new(0, dropdownSize.X, 0, finalH), BackgroundTransparency = 0}):Play()
                 end
             end)
 
+            Content:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+                if list.Visible then closeList() end
+            end)
+
             Page:GetPropertyChangedSignal("Visible"):Connect(function()
-                if not Page.Visible and list.Visible then list.Visible = false end
+                if not Page.Visible and list.Visible then closeList() end
             end)
 
             if props.flag then Sansik.Flags[props.flag] = currentValues end
@@ -2303,48 +2330,23 @@ function Sansik:Window(props)
             clickable.MouseLeave:Connect(function() tween(cp, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackground}):Play() end)
 
             local popup = Instance.new("Frame")
+            popup.Name = "ColorPickerPopup"
             popup.Size = UDim2.new(0, 320, 0, 200)
             popup.BackgroundColor3 = Sansik.Theme.DropdownBackground
             popup.BorderSizePixel = 0
             popup.Visible = false
             popup.ClipsDescendants = false
-            popup.ZIndex = 601
-            popup.Parent = ColorPickerLayer
+            popup.ZIndex = 1
+            popup.Parent = PopupLayer
             corner(popup, 10)
             stroke(popup, Sansik.Theme.ElementStroke, 1, 0.5)
-
-            local function updatePopupPosition()
-                local cpAbs = cp.AbsolutePosition
-                local mainAbs = Main.AbsolutePosition
-                local mainSize = Main.AbsoluteSize
-                local popupW, popupH = 320, 200
-                local padding = 10
-                local relX = cpAbs.X - mainAbs.X
-                local relY = cpAbs.Y - mainAbs.Y + cp.AbsoluteSize.Y + 4
-
-                if relX + popupW > mainSize.X - padding then relX = mainSize.X - popupW - padding end
-                if relX < padding then relX = padding end
-
-                -- Если не влезает снизу — сверху (но только если сверху есть место)
-                if relY + popupH > mainSize.Y - padding then
-                    local topY = cpAbs.Y - mainAbs.Y - popupH - 4
-                    if topY >= padding then
-                        relY = topY
-                    else
-                        relY = mainSize.Y - popupH - padding
-                    end
-                end
-                if relY < padding then relY = padding end
-
-                popup.Position = UDim2.new(0, relX, 0, relY)
-            end
 
             local svArea = Instance.new("Frame")
             svArea.Size = UDim2.new(0, 150, 0, 150)
             svArea.Position = UDim2.new(0, 14, 0, 14)
             svArea.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
             svArea.BorderSizePixel = 0
-            svArea.ZIndex = 602
+            svArea.ZIndex = 2
             svArea.Parent = popup
             corner(svArea, 6)
             stroke(svArea, Sansik.Theme.ElementStroke, 1, 0)
@@ -2353,7 +2355,7 @@ function Sansik:Window(props)
             whiteGradient.Size = UDim2.new(1, 0, 1, 0)
             whiteGradient.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             whiteGradient.BorderSizePixel = 0
-            whiteGradient.ZIndex = 603
+            whiteGradient.ZIndex = 3
             whiteGradient.Parent = svArea
             corner(whiteGradient, 6)
             local wg = Instance.new("UIGradient")
@@ -2367,7 +2369,7 @@ function Sansik:Window(props)
             blackGradient.Size = UDim2.new(1, 0, 1, 0)
             blackGradient.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
             blackGradient.BorderSizePixel = 0
-            blackGradient.ZIndex = 604
+            blackGradient.ZIndex = 4
             blackGradient.Parent = svArea
             corner(blackGradient, 6)
             local bg = Instance.new("UIGradient")
@@ -2382,7 +2384,7 @@ function Sansik:Window(props)
             svDot.Size = UDim2.new(0, 16, 0, 16)
             svDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             svDot.BorderSizePixel = 0
-            svDot.ZIndex = 605
+            svDot.ZIndex = 5
             svDot.Parent = svArea
             corner(svDot, 8)
             stroke(svDot, Color3.fromRGB(0, 0, 0), 2, 0)
@@ -2392,7 +2394,7 @@ function Sansik:Window(props)
             hueSlider.Position = UDim2.new(0, 178, 0, 14)
             hueSlider.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             hueSlider.BorderSizePixel = 0
-            hueSlider.ZIndex = 602
+            hueSlider.ZIndex = 2
             hueSlider.Parent = popup
             corner(hueSlider, 8)
             local hueGradient = Instance.new("UIGradient")
@@ -2413,7 +2415,7 @@ function Sansik:Window(props)
             hueDot.Position = UDim2.new(0.5, -12, 0, 0)
             hueDot.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             hueDot.BorderSizePixel = 0
-            hueDot.ZIndex = 605
+            hueDot.ZIndex = 5
             hueDot.Parent = hueSlider
             corner(hueDot, 5)
             stroke(hueDot, Color3.fromRGB(0, 0, 0), 1.5, 0)
@@ -2423,7 +2425,7 @@ function Sansik:Window(props)
             previewBig.Position = UDim2.new(0, 208, 0, 14)
             previewBig.BackgroundColor3 = currentColor
             previewBig.BorderSizePixel = 0
-            previewBig.ZIndex = 602
+            previewBig.ZIndex = 2
             previewBig.Parent = popup
             corner(previewBig, 6)
             stroke(previewBig, Sansik.Theme.ElementStroke, 1, 0)
@@ -2439,7 +2441,7 @@ function Sansik:Window(props)
             hexBox.TextColor3 = Sansik.Theme.InputText
             hexBox.TextXAlignment = Enum.TextXAlignment.Center
             hexBox.ClearTextOnFocus = false
-            hexBox.ZIndex = 602
+            hexBox.ZIndex = 2
             hexBox.Parent = popup
             corner(hexBox, 6)
 
@@ -2454,7 +2456,7 @@ function Sansik:Window(props)
             alphaBox.TextColor3 = Sansik.Theme.InputText
             alphaBox.TextXAlignment = Enum.TextXAlignment.Center
             alphaBox.ClearTextOnFocus = false
-            alphaBox.ZIndex = 602
+            alphaBox.ZIndex = 2
             alphaBox.Parent = popup
             corner(alphaBox, 6)
 
@@ -2464,7 +2466,7 @@ function Sansik:Window(props)
             popupClose.BackgroundColor3 = Sansik.Theme.ElementBackground
             popupClose.BorderSizePixel = 0
             popupClose.AutoButtonColor = false
-            popupClose.ZIndex = 610
+            popupClose.ZIndex = 10
             popupClose.Parent = popup
             corner(popupClose, 6)
             local closeIco = getIcon("x")
@@ -2502,7 +2504,7 @@ function Sansik:Window(props)
             svInput.BackgroundTransparency = 1
             svInput.Text = ""
             svInput.AutoButtonColor = false
-            svInput.ZIndex = 606
+            svInput.ZIndex = 6
             svInput.Parent = svArea
             local function updateSV(input)
                 local relX = math.clamp((input.Position.X - svArea.AbsolutePosition.X) / svArea.AbsoluteSize.X, 0, 1)
@@ -2534,7 +2536,7 @@ function Sansik:Window(props)
             hueInput.BackgroundTransparency = 1
             hueInput.Text = ""
             hueInput.AutoButtonColor = false
-            hueInput.ZIndex = 606
+            hueInput.ZIndex = 6
             hueInput.Parent = hueSlider
             local function updateHue(input)
                 local relY = math.clamp((input.Position.Y - hueSlider.AbsolutePosition.Y) / hueSlider.AbsoluteSize.Y, 0, 1)
@@ -2587,11 +2589,40 @@ function Sansik:Window(props)
                 else
                     if openColorPicker and openColorPicker.close then openColorPicker.close() end
                     if openDropdownList then openDropdownList.Visible = false openDropdownList = nil end
-                    updatePopupPosition()
+
+                    -- Позиция: под элементом, через AbsolutePosition
+                    local cpAbs = cp.AbsolutePosition
+                    local cpSize = cp.AbsoluteSize
+                    local popupW, popupH = 320, 200
+                    local padding = 8
+                    local viewportSize = workspace.CurrentCamera.ViewportSize
+
+                    local targetX = cpAbs.X
+                    local targetY = cpAbs.Y + cpSize.Y + 4
+
+                    if targetX + popupW > viewportSize.X - padding then
+                        targetX = viewportSize.X - popupW - padding
+                    end
+                    if targetX < padding then targetX = padding end
+
+                    if targetY + popupH > viewportSize.Y - padding then
+                        local topY = cpAbs.Y - popupH - 4
+                        if topY >= padding then
+                            targetY = topY
+                        else
+                            targetY = viewportSize.Y - popupH - padding
+                        end
+                    end
+
+                    popup.Position = UDim2.new(0, targetX, 0, targetY)
                     popup.Visible = true
                     openColorPicker = {popup = popup, close = closePopup}
                     tween(cp, 0.15, {BackgroundColor3 = Sansik.Theme.ElementBackgroundHover}):Play()
                 end
+            end)
+
+            Content:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+                if popup.Visible then closePopup() end
             end)
 
             Page:GetPropertyChangedSignal("Visible"):Connect(function()
@@ -2732,7 +2763,6 @@ function Sansik:Window(props)
     return Window
 end
 
--- Глобальный K — переключает ТОЛЬКО активное окно
 Services.UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
     if input.KeyCode == Enum.KeyCode.K then
